@@ -1,6 +1,7 @@
-import { Box, Button, Grid, GridItem, Input, Textarea, Select, Checkbox, Text } from '@chakra-ui/react'
+'use client'
+
+import { Box, Button, Grid, GridItem, Input, Textarea, Select, Checkbox, Text, FormControl, FormLabel } from '@chakra-ui/react'
 import React, { useState } from 'react'
-import { SubmitHandler, useForm } from 'react-hook-form'
 
 interface IForminput {
   subject: string
@@ -16,14 +17,36 @@ interface IForminput {
 
 function ContactForm() {
   const [submitted, setSubmitted] = useState(false)
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<IForminput>()
+  const [formData, setFormData] = useState<IForminput>({
+    subject: '',
+    name: '',
+    email: '',
+    message: '',
+    phone: '',
+    organization: '',
+    investmentInterest: '',
+    investmentSize: '',
+    areasOfInterest: []
+  })
 
-  const onSubmit: SubmitHandler<IForminput> = async (data) => {
-    fetch('/api/createcontact', {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleCheckboxChange = (value: string, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      areasOfInterest: checked 
+        ? [...(prev.areasOfInterest || []), value]
+        : (prev.areasOfInterest || []).filter(item => item !== value)
+    }))
+  }
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const data = formData
+    fetch('/api/contact', {
       method: 'Post',
       body: JSON.stringify(data),
     })
@@ -52,55 +75,68 @@ function ContactForm() {
           </p>
         </Box>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="mx-auto max-w-5xl">
+        <form onSubmit={onSubmit} className="mx-auto max-w-5xl">
           <Grid className="my-5 gap-6" templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }}>
             <GridItem>
               <label htmlFor="name" className="font-semibold">Name *</label>
               <Input
-                {...register('name', { required: true })}
+                name="name"
                 id="name"
                 type="text"
                 placeholder="Full Name"
                 mt={2}
+                value={formData.name}
+                onChange={handleInputChange}
+                required
               />
             </GridItem>
             <GridItem>
               <label htmlFor="email" className="font-semibold">Email *</label>
               <Input
-                {...register('email', { required: true })}
+                name="email"
                 id="email"
                 type="email"
                 placeholder="your.email@example.com"
                 mt={2}
+                value={formData.email}
+                onChange={handleInputChange}
+                required
               />
             </GridItem>
             <GridItem>
               <label htmlFor="phone" className="font-semibold">Phone Number *</label>
               <Input
-                {...register('phone', { required: true })}
+                name="phone"
                 id="phone"
                 type="text"
                 placeholder="+256 XXX XXX XXX"
                 mt={2}
+                value={formData.phone}
+                onChange={handleInputChange}
+                required
               />
             </GridItem>
             <GridItem>
               <label htmlFor="organization" className="font-semibold">Organization/Fund Name</label>
               <Input
-                {...register('organization')}
+                name="organization"
                 id="organization"
                 type="text"
                 placeholder="Your Organization"
                 mt={2}
+                value={formData.organization}
+                onChange={handleInputChange}
               />
             </GridItem>
             <GridItem colSpan={{ base: 1, md: 2 }}>
               <label htmlFor="investmentInterest" className="font-semibold">Investment Interest Level</label>
               <Select
-                {...register('investmentInterest')}
+                name="investmentInterest"
                 id="investmentInterest"
                 placeholder="Select interest level"
                 mt={2}
+                value={formData.investmentInterest}
+                onChange={handleInputChange}
               >
                 <option value="exploratory">Exploratory - Learning More</option>
                 <option value="serious">Serious Consideration</option>
@@ -110,10 +146,12 @@ function ContactForm() {
             <GridItem colSpan={{ base: 1, md: 2 }}>
               <label htmlFor="investmentSize" className="font-semibold">Investment Size Range (Optional)</label>
               <Select
-                {...register('investmentSize')}
+                name="investmentSize"
                 id="investmentSize"
                 placeholder="Select range (optional)"
                 mt={2}
+                value={formData.investmentSize}
+                onChange={handleInputChange}
               >
                 <option value="1-5M">$1M - $5M</option>
                 <option value="5-15M">$5M - $15M</option>
@@ -124,19 +162,34 @@ function ContactForm() {
             <GridItem colSpan={{ base: 1, md: 2 }}>
               <label className="font-semibold block mb-2">Areas of Interest (Check all that apply)</label>
               <Grid templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)' }} gap={2}>
-                <Checkbox {...register('areasOfInterest')} value="hospital">
+                <Checkbox 
+                  isChecked={formData.areasOfInterest?.includes('hospital')}
+                  onChange={(e) => handleCheckboxChange('hospital', e.target.checked)}
+                >
                   Hospital Project ($25M)
                 </Checkbox>
-                <Checkbox {...register('areasOfInterest')} value="golf">
+                <Checkbox 
+                  isChecked={formData.areasOfInterest?.includes('golf')}
+                  onChange={(e) => handleCheckboxChange('golf', e.target.checked)}
+                >
                   Golf Course ($10M)
                 </Checkbox>
-                <Checkbox {...register('areasOfInterest')} value="hotel">
+                <Checkbox 
+                  isChecked={formData.areasOfInterest?.includes('hotel')}
+                  onChange={(e) => handleCheckboxChange('hotel', e.target.checked)}
+                >
                   5-Star Hotel
                 </Checkbox>
-                <Checkbox {...register('areasOfInterest')} value="mixed-use">
+                <Checkbox 
+                  isChecked={formData.areasOfInterest?.includes('mixed-use')}
+                  onChange={(e) => handleCheckboxChange('mixed-use', e.target.checked)}
+                >
                   Mixed-Use Development
                 </Checkbox>
-                <Checkbox {...register('areasOfInterest')} value="full">
+                <Checkbox 
+                  isChecked={formData.areasOfInterest?.includes('full')}
+                  onChange={(e) => handleCheckboxChange('full', e.target.checked)}
+                >
                   Full Integrated Project
                 </Checkbox>
               </Grid>
@@ -144,21 +197,27 @@ function ContactForm() {
             <GridItem colSpan={{ base: 1, md: 2 }}>
               <label htmlFor="subject" className="font-semibold">Subject *</label>
               <Input
-                {...register('subject', { required: true })}
+                name="subject"
                 id="subject"
                 type="text"
                 placeholder="Investment Inquiry / General Question"
                 mt={2}
+                value={formData.subject}
+                onChange={handleInputChange}
+                required
               />
             </GridItem>
             <GridItem colSpan={{ base: 1, md: 2 }}>
               <label htmlFor="message" className="font-semibold">Message / Questions *</label>
               <Textarea
-                {...register('message', { required: true })}
+                name="message"
                 id="message"
                 placeholder="Tell us about your investment interests, questions, or how we can help..."
                 rows={6}
                 mt={2}
+                value={formData.message}
+                onChange={handleInputChange}
+                required
               />
             </GridItem>
           </Grid>

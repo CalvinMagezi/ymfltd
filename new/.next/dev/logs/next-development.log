@@ -1,0 +1,3 @@
+[00:01:48.104] Server  ERROR   Error: ENOENT: no such file or directory, scandir '/Users/calvinmagezi/Documents/GitHub/ymfltd/new/app'
+[00:01:48.105] Server  ERROR    ⨯ "unhandledRejection:" Error: ENOENT: no such file or directory, scandir '/Users/calvinmagezi/Documents/GitHub/ymfltd/new/app'
+[00:01:48.106] Server  ERROR    ⨯ "unhandledRejection: " Error: ENOENT: no such file or directory, scandir '/Users/calvinmagezi/Documents/GitHub/ymfltd/new/app'

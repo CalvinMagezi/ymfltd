@@ -1,4 +1,6 @@
-import { Box, Flex, Heading, Text, SimpleGrid } from '@chakra-ui/react'
+'use client'
+
+import { Box, Flex, Heading, Text, SimpleGrid, useColorModeValue, Container } from '@chakra-ui/react'
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 
@@ -101,20 +103,44 @@ const StatCard = ({ number, label, context, source, color, delay, isNumber = tru
 }
 
 function MarketOpportunity() {
+  const sectionBg = useColorModeValue('gray.50', 'gray.900')
+  const headingColor = useColorModeValue('gray.800', 'white')
+  const subheadingColor = useColorModeValue('blue.600', 'blue.300')
+  const textColor = useColorModeValue('gray.600', 'gray.300')
+  const calloutBg = useColorModeValue('blue.600', 'blue.700')
+  const calloutText = useColorModeValue('white', 'white')
+  
   return (
-    <Box id="market-data" className="body-font py-24 bg-gray.50" _dark={{ bg: 'gray.900' }}>
-      <Box className="container mx-auto px-5">
-        <Flex className="mb-20 w-full flex-col text-center">
-          <Text className="title-font mb-2 text-xs font-medium tracking-widest text-blue.500">
+    <Box id="market-data" bg={sectionBg} py={24}>
+      <Container maxW="7xl">
+        <Flex mb={20} w="full" direction="column" textAlign="center">
+          <Text 
+            fontSize="xs" 
+            fontWeight="medium" 
+            letterSpacing="widest"
+            color={subheadingColor}
+            mb={2}
+            textTransform="uppercase"
+          >
             DATA-DRIVEN INSIGHTS
           </Text>
           <Heading
             as="h2"
-            className="title-font mb-4 text-3xl font-medium sm:text-4xl"
+            fontSize={{ base: '3xl', sm: '4xl', lg: '5xl' }}
+            fontWeight="bold"
+            color={headingColor}
+            mb={6}
+            lineHeight="tight"
           >
             Market Opportunity by Numbers
           </Heading>
-          <Text className="mx-auto text-base leading-relaxed text-gray.600 lg:w-2/3" _dark={{ color: 'gray.300' }}>
+          <Text 
+            fontSize={{ base: 'md', lg: 'lg' }}
+            lineHeight="relaxed" 
+            color={textColor}
+            maxW="2xl"
+            mx="auto"
+          >
             Comprehensive market analysis reveals unprecedented opportunity in Uganda's
             fastest-growing region with strong fundamentals and minimal competition.
           </Text>
@@ -172,32 +198,78 @@ function MarketOpportunity() {
           />
         </SimpleGrid>
 
-        <Box mt={16} bg="blue.600" p={8} borderRadius="xl" color="white" textAlign="center">
-          <Heading size="lg" mb={4}>
+        <Box 
+          mt={16} 
+          bg={calloutBg}
+          p={8} 
+          borderRadius="xl" 
+          color={calloutText} 
+          textAlign="center"
+          boxShadow="2xl"
+        >
+          <Heading 
+            size="lg" 
+            mb={4}
+            color={calloutText}
+            fontSize={{ base: '2xl', md: '3xl' }}
+          >
             Why Now? The Perfect Storm of Opportunity
           </Heading>
           <SimpleGrid columns={{ base: 1, md: 3 }} spacing={8} mt={8}>
             <Box>
-              <Text fontSize="2xl" fontWeight="bold" mb={2}>🛢️ Oil Discovery</Text>
-              <Text fontSize="sm">
+              <Text 
+                fontSize="2xl" 
+                fontWeight="bold" 
+                mb={2}
+                color={calloutText}
+              >
+                🛢️ Oil Discovery
+              </Text>
+              <Text 
+                fontSize="sm"
+                color={calloutText}
+                opacity={0.9}
+              >
                 Largest oil discovery in sub-Saharan Africa bringing massive infrastructure investment
               </Text>
             </Box>
             <Box>
-              <Text fontSize="2xl" fontWeight="bold" mb={2}>✈️ Airport Opening</Text>
-              <Text fontSize="sm">
+              <Text 
+                fontSize="2xl" 
+                fontWeight="bold" 
+                mb={2}
+                color={calloutText}
+              >
+                ✈️ Airport Opening
+              </Text>
+              <Text 
+                fontSize="sm"
+                color={calloutText}
+                opacity={0.9}
+              >
                 International airport transforms regional accessibility and tourism potential
               </Text>
             </Box>
             <Box>
-              <Text fontSize="2xl" fontWeight="bold" mb={2}>🏥 Healthcare Gap</Text>
-              <Text fontSize="sm">
+              <Text 
+                fontSize="2xl" 
+                fontWeight="bold" 
+                mb={2}
+                color={calloutText}
+              >
+                🏥 Healthcare Gap
+              </Text>
+              <Text 
+                fontSize="sm"
+                color={calloutText}
+                opacity={0.9}
+              >
                 Critical shortage of quality healthcare creates captive market with zero competition
               </Text>
             </Box>
           </SimpleGrid>
         </Box>
-      </Box>
+      </Container>
     </Box>
   )
 }

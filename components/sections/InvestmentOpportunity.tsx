@@ -1,4 +1,6 @@
-import { Box, Flex, Heading, Text, SimpleGrid, Button, List, ListItem, ListIcon } from '@chakra-ui/react'
+'use client'
+
+import { Box, Flex, Heading, Text, SimpleGrid, Button, List, ListItem, ListIcon, useColorModeValue } from '@chakra-ui/react'
 import { motion } from 'framer-motion'
 import { FaCheckCircle, FaHospital, FaGolfBall, FaHotel, FaHome } from 'react-icons/fa'
 import Link from 'next/link'
@@ -6,25 +8,46 @@ import Link from 'next/link'
 const MotionBox = motion(Box)
 
 function InvestmentOpportunity() {
+  const sectionBg = useColorModeValue('linear(to-br, gray.100, blue.100)', 'linear(to-br, gray.900, blue.900)')
+  const headingColor = useColorModeValue('gray.800', 'white')
+  const subheadingColor = useColorModeValue('blue.600', 'blue.300')
+  const textColor = useColorModeValue('gray.600', 'gray.300')
+  
   return (
     <Box
       id="investment"
       className="body-font py-24"
-      bg="gray.900"
-      bgGradient="linear(to-br, gray.900, blue.900)"
+      bgGradient={sectionBg}
     >
       <Box className="container mx-auto px-5">
         <Flex className="mb-12 w-full flex-col text-center">
-          <Text className="title-font mb-2 text-xs font-medium tracking-widest text-blue.300">
+          <Text 
+            fontSize="xs" 
+            fontWeight="medium" 
+            letterSpacing="widest"
+            color={subheadingColor}
+            mb={2}
+            textTransform="uppercase"
+          >
             SERIES A OPPORTUNITY
           </Text>
           <Heading
             as="h2"
-            className="title-font mb-4 text-3xl font-medium text-white sm:text-5xl"
+            fontSize={{ base: '3xl', sm: '5xl' }}
+            fontWeight="bold"
+            color={headingColor}
+            mb={4}
+            lineHeight="tight"
           >
             Investment Opportunity
           </Heading>
-          <Text className="mx-auto text-lg leading-relaxed text-gray.300 lg:w-2/3">
+          <Text 
+            fontSize="lg" 
+            lineHeight="relaxed" 
+            color={textColor}
+            maxW="2xl"
+            mx="auto"
+          >
             Join us in building Uganda's first integrated agro-industrial satellite town
             with exceptional returns and transformative social impact.
           </Text>
@@ -207,22 +230,21 @@ function InvestmentOpportunity() {
           >
             Download Investment Overview
           </Button>
-          <Link href="#contact" passHref>
-            <Button
-              as="a"
-              size="lg"
-              colorScheme="green"
-              bg="green.500"
-              _hover={{ bg: 'green.600', transform: 'scale(1.05)' }}
-              px={10}
-              py={7}
-              fontSize="lg"
-              fontWeight="bold"
-              boxShadow="xl"
-            >
-              Schedule Consultation
-            </Button>
-          </Link>
+          <Button
+            as={Link}
+            href="#contact"
+            size="lg"
+            colorScheme="green"
+            bg="green.500"
+            _hover={{ bg: 'green.600', transform: 'scale(1.05)' }}
+            px={10}
+            py={7}
+            fontSize="lg"
+            fontWeight="bold"
+            boxShadow="xl"
+          >
+            Schedule Consultation
+          </Button>
           <Button
             size="lg"
             variant="outline"

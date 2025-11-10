@@ -1,9 +1,11 @@
+'use client'
+
 import { urlFor } from '@/lib/sanity'
-import { Box, Flex, Heading, Text, Badge, Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react'
+import { Box, Flex, Heading, Text, Badge, Tabs, TabList, TabPanels, Tab, TabPanel, useColorModeValue } from '@chakra-ui/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import React from 'react'
-import { Project } from 'typings'
+import { Project } from '../../typings'
 
 interface SingleProject {
   name: string
@@ -22,28 +24,45 @@ const ProjectCard = ({ name, img, excerpt, slug, investmentSize, phase = 1, mark
     2: 'blue',
     3: 'purple',
   }
+  
+  const cardBg = useColorModeValue('rgba(45, 55, 72, 0.6)', 'rgba(45, 55, 72, 0.8)')
+  const cardHoverBg = useColorModeValue('gray.700', 'gray.600')
+  const borderColor = useColorModeValue('gray.600', 'gray.500')
+  const titleColor = useColorModeValue('white', 'white')
+  const textColor = useColorModeValue('gray.300', 'gray.400')
+  const marketDataColor = useColorModeValue('blue.300', 'blue.200')
 
   return (
-    <Link href={`/projects/${slug}`}>
-      <Box className="cursor-pointer p-4 md:w-1/2 xl:w-1/3">
+    <Box w={{ base: 'full', md: '50%', xl: '33.333%' }} p={4}>
+      <Link href={`/projects/${slug}`}>
         <Box
-          className="rounded-lg bg-gray-800 bg-opacity-40 p-6 h-full"
+          bg={cardBg}
+          borderRadius="lg"
+          p={6}
+          h="full"
+          cursor="pointer"
           _hover={{
             transform: 'translateY(-8px)',
             boxShadow: '2xl',
-            bg: 'gray.700',
+            bg: cardHoverBg,
           }}
           transition="all 0.3s"
-          border="1px"
-          borderColor="gray.700"
+          border="1px solid"
+          borderColor={borderColor}
+          backdropFilter="blur(10px)"
         >
-          <Box position="relative">
+          <Box position="relative" mb={6}>
             <Image
-              width="720"
-              height="400"
-              className="mb-6 rounded object-cover object-center"
+              width={720}
+              height={400}
               src={img}
-              alt="content"
+              alt={name}
+              style={{
+                width: '100%',
+                height: '200px',
+                objectFit: 'cover',
+                borderRadius: '8px'
+              }}
             />
             {investmentSize && (
               <Badge
@@ -55,31 +74,51 @@ const ProjectCard = ({ name, img, excerpt, slug, investmentSize, phase = 1, mark
                 px={3}
                 py={1}
                 borderRadius="md"
+                fontWeight="bold"
               >
                 ${investmentSize}
               </Badge>
             )}
           </Box>
           <Flex gap={2} mb={3} flexWrap="wrap">
-            <Badge colorScheme={phaseColors[phase]} fontSize="xs">
+            <Badge colorScheme={phaseColors[phase]} fontSize="xs" px={2} py={1}>
               Phase {phase}
             </Badge>
             {partnership && (
-              <Badge colorScheme="purple" fontSize="xs">
+              <Badge colorScheme="purple" fontSize="xs" px={2} py={1}>
                 {partnership}
               </Badge>
             )}
           </Flex>
-          <Text className="title-font mb-2 text-lg font-medium ">{name}</Text>
+          <Text 
+            fontSize="lg" 
+            fontWeight="semibold" 
+            color={titleColor}
+            mb={2}
+            lineHeight="tight"
+          >
+            {name}
+          </Text>
           {marketData && (
-            <Text className="text-sm text-blue-300 mb-2 font-semibold">
+            <Text 
+              fontSize="sm" 
+              color={marketDataColor}
+              mb={2} 
+              fontWeight="semibold"
+            >
               📊 {marketData}
             </Text>
           )}
-          <Text className="text-base leading-relaxed text-gray-400">{excerpt}</Text>
+          <Text 
+            fontSize="md" 
+            color={textColor}
+            lineHeight="relaxed"
+          >
+            {excerpt}
+          </Text>
         </Box>
-      </Box>
-    </Link>
+      </Link>
+    </Box>
   )
 }
 
@@ -168,9 +207,16 @@ const enhanceProject = (project: Project): SingleProject => {
 
 function Projects({ projects }: ProjectProps) {
   const categorized = categorizeProjects(projects)
+  
+  const sectionBg = useColorModeValue('gray.900', 'gray.900')
+  const headingColor = useColorModeValue('white', 'white')
+  const subheadingColor = useColorModeValue('blue.400', 'blue.300')
+  const textColor = useColorModeValue('gray.300', 'gray.400')
+  const tabColor = useColorModeValue('gray.400', 'gray.500')
+  const tabSelectedBg = useColorModeValue('blue.600', 'blue.500')
 
   const renderProjectGrid = (projectList: Project[]) => (
-    <Flex className="-m-4 flex-wrap">
+    <Flex flexWrap="wrap" mx={-4}>
       {projectList.map((project) => {
         const enhanced = enhanceProject(project)
         return (
@@ -184,75 +230,156 @@ function Projects({ projects }: ProjectProps) {
   )
 
   return (
-    <Box id="projects" className="body-font bg-gray-900 py-24">
-      <Box className="container mx-auto px-5">
-        <Flex className="mb-20 w-full flex-wrap">
-          <Box className="mb-6 w-full lg:mb-0 lg:w-1/2">
-            <Text className="title-font mb-2 text-xs font-medium tracking-widest text-blue-400">
+    <Box 
+      id="projects" 
+      bg={sectionBg}
+      py={24}
+      minH="100vh"
+    >
+      <Box maxW="7xl" mx="auto" px={5}>
+        <Flex mb={20} w="full" flexWrap="wrap" alignItems="center">
+          <Box mb={{ base: 6, lg: 0 }} w={{ base: 'full', lg: '50%' }}>
+            <Text 
+              fontSize="xs" 
+              fontWeight="medium" 
+              letterSpacing="widest"
+              color={subheadingColor}
+              mb={2}
+              textTransform="uppercase"
+            >
               INTEGRATED DEVELOPMENT
             </Text>
             <Heading
               as="h1"
-              className="title-font mb-2 text-2xl font-medium text-white sm:text-3xl"
+              fontSize={{ base: '2xl', sm: '3xl', lg: '4xl' }}
+              fontWeight="bold"
+              color={headingColor}
+              mb={4}
+              lineHeight="tight"
             >
               Our Projects
             </Heading>
-            <div className="h-1 w-20 rounded bg-blue-500"></div>
+            <Box h={1} w={20} bg="blue.500" borderRadius="md" />
           </Box>
-          <Text className="w-full leading-relaxed text-gray-300 lg:w-1/2">
+          <Text 
+            w={{ base: 'full', lg: '50%' }}
+            fontSize={{ base: 'md', lg: 'lg' }}
+            lineHeight="relaxed" 
+            color={textColor}
+          >
             Through the undertaking of various projects and partnering with the most reliable service
             providers for each respective project, we intend to build our city as a self-sustainable,
             wealth-generating satellite town for its occupants and surrounding communities.
           </Text>
         </Flex>
 
-        <Tabs variant="enclosed" colorScheme="blue">
-          <TabList mb={8} flexWrap="wrap">
-            <Tab _selected={{ color: 'white', bg: 'blue.600' }}>
+        <Tabs variant="enclosed" colorScheme="blue" size="lg">
+          <TabList mb={8} flexWrap="wrap" gap={2}>
+            <Tab 
+              _selected={{ color: 'white', bg: tabSelectedBg }}
+              color={tabColor}
+              fontWeight="semibold"
+              fontSize={{ base: 'sm', md: 'md' }}
+              px={{ base: 3, md: 4 }}
+              py={{ base: 2, md: 3 }}
+            >
               Anchor Projects (Phase 1)
             </Tab>
-            <Tab _selected={{ color: 'white', bg: 'blue.600' }}>
+            <Tab 
+              _selected={{ color: 'white', bg: tabSelectedBg }}
+              color={tabColor}
+              fontWeight="semibold"
+              fontSize={{ base: 'sm', md: 'md' }}
+              px={{ base: 3, md: 4 }}
+              py={{ base: 2, md: 3 }}
+            >
               Revenue Assets (Phase 1B)
             </Tab>
-            <Tab _selected={{ color: 'white', bg: 'blue.600' }}>
+            <Tab 
+              _selected={{ color: 'white', bg: tabSelectedBg }}
+              color={tabColor}
+              fontWeight="semibold"
+              fontSize={{ base: 'sm', md: 'md' }}
+              px={{ base: 3, md: 4 }}
+              py={{ base: 2, md: 3 }}
+            >
               Conservation & Tourism
             </Tab>
-            <Tab _selected={{ color: 'white', bg: 'blue.600' }}>
+            <Tab 
+              _selected={{ color: 'white', bg: tabSelectedBg }}
+              color={tabColor}
+              fontWeight="semibold"
+              fontSize={{ base: 'sm', md: 'md' }}
+              px={{ base: 3, md: 4 }}
+              py={{ base: 2, md: 3 }}
+            >
               Agricultural Development
             </Tab>
-            <Tab _selected={{ color: 'white', bg: 'blue.600' }}>
+            <Tab 
+              _selected={{ color: 'white', bg: tabSelectedBg }}
+              color={tabColor}
+              fontWeight="semibold"
+              fontSize={{ base: 'sm', md: 'md' }}
+              px={{ base: 3, md: 4 }}
+              py={{ base: 2, md: 3 }}
+            >
               All Projects
             </Tab>
           </TabList>
 
           <TabPanels>
-            <TabPanel>
-              <Text color="gray.300" mb={6}>
+            <TabPanel px={0}>
+              <Text 
+                color={textColor} 
+                mb={6} 
+                fontSize={{ base: 'md', lg: 'lg' }}
+                lineHeight="relaxed"
+              >
                 Investment-ready anchor projects forming the foundation of Phase 1 development.
                 These projects are designed to generate immediate value and establish market presence.
               </Text>
               {renderProjectGrid(categorized.anchor.length > 0 ? categorized.anchor : projects.slice(0, 4))}
             </TabPanel>
-            <TabPanel>
-              <Text color="gray.300" mb={6}>
+            <TabPanel px={0}>
+              <Text 
+                color={textColor} 
+                mb={6} 
+                fontSize={{ base: 'md', lg: 'lg' }}
+                lineHeight="relaxed"
+              >
                 Revenue-generating assets that complement anchor projects and diversify income streams.
               </Text>
               {renderProjectGrid(categorized.revenue.length > 0 ? categorized.revenue : projects.slice(4, 7))}
             </TabPanel>
-            <TabPanel>
-              <Text color="gray.300" mb={6}>
+            <TabPanel px={0}>
+              <Text 
+                color={textColor} 
+                mb={6} 
+                fontSize={{ base: 'md', lg: 'lg' }}
+                lineHeight="relaxed"
+              >
                 Conservation and eco-tourism projects in partnership with Uganda Wildlife Authority.
               </Text>
               {renderProjectGrid(categorized.conservation.length > 0 ? categorized.conservation : projects.slice(7, 10))}
             </TabPanel>
-            <TabPanel>
-              <Text color="gray.300" mb={6}>
+            <TabPanel px={0}>
+              <Text 
+                color={textColor} 
+                mb={6} 
+                fontSize={{ base: 'md', lg: 'lg' }}
+                lineHeight="relaxed"
+              >
                 Agricultural development projects leveraging our proven farming expertise.
               </Text>
               {renderProjectGrid(categorized.agriculture.length > 0 ? categorized.agriculture : projects.slice(10, 13))}
             </TabPanel>
-            <TabPanel>
-              <Text color="gray.300" mb={6}>
+            <TabPanel px={0}>
+              <Text 
+                color={textColor} 
+                mb={6} 
+                fontSize={{ base: 'md', lg: 'lg' }}
+                lineHeight="relaxed"
+              >
                 Complete portfolio of 15+ integrated projects across all development phases.
               </Text>
               {renderProjectGrid(projects)}

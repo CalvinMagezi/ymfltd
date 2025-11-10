@@ -1,22 +1,49 @@
-import { Box, Flex, Heading, Text, Badge, SimpleGrid } from '@chakra-ui/react'
+'use client'
+
+import { Box, Flex, Heading, Text, Badge, SimpleGrid, useColorModeValue, Container, VStack } from '@chakra-ui/react'
 import Image from 'next/image'
 import React from 'react'
 
 function Team() {
+  const sectionBg = useColorModeValue('gray.50', 'gray.900')
+  const headingColor = useColorModeValue('gray.800', 'white')
+  const subheadingColor = useColorModeValue('blue.600', 'blue.300')
+  const textColor = useColorModeValue('gray.600', 'gray.300')
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const cardBorder = useColorModeValue('gray.200', 'gray.700')
+  
   return (
-    <Box id="members" className="body-font bg-gray-50" _dark={{ bg: 'gray.900' }} py={24}>
-      <Box className="container mx-auto px-5">
-        <Flex className="mb-20 w-full flex-col text-center">
-          <Text className="title-font mb-2 text-xs font-medium tracking-widest text-blue-500">
+    <Box id="members" bg={sectionBg} py={24}>
+      <Container maxW="7xl">
+        <Flex mb={20} w="full" direction="column" textAlign="center">
+          <Text 
+            fontSize="xs" 
+            fontWeight="medium" 
+            letterSpacing="widest"
+            color={subheadingColor}
+            mb={2}
+            textTransform="uppercase"
+          >
             LEADERSHIP & GOVERNANCE
           </Text>
           <Heading
             as="h1"
-            className="title-font mb-4 text-2xl font-medium tracking-widest sm:text-4xl"
+            fontSize={{ base: '2xl', sm: '4xl' }}
+            fontWeight="bold"
+            color={headingColor}
+            mb={4}
+            letterSpacing="wide"
+            lineHeight="tight"
           >
             Our Team
           </Heading>
-          <Text className="mx-auto text-base leading-relaxed lg:w-2/3">
+          <Text 
+            fontSize="md" 
+            lineHeight="relaxed" 
+            color={textColor}
+            maxW="2xl"
+            mx="auto"
+          >
             Multi-generational commitment with legal, judicial, and business expertise.
             The Yesero Mugenyi Foundation is led by his family and grandchildren who have
             come together with all of their respective skill sets to form a powerful team
@@ -25,10 +52,15 @@ function Team() {
         </Flex>
         {/* Leadership Section */}
         <Box mb={12}>
-          <Heading size="md" mb={6} color="blue.600" _dark={{ color: 'blue.400' }}>
+          <Heading 
+            size="md" 
+            mb={6} 
+            color={subheadingColor}
+            textAlign="center"
+          >
             Executive Leadership
           </Heading>
-          <Flex className="-m-4 flex-wrap">
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
             <Member
               name="Yesero Mugenyi"
               position="Founder & Visionary"
@@ -53,15 +85,33 @@ function Team() {
                 "Overseeing project development strategy",
               ]}
             />
-          </Flex>
+            <Member
+              name="Mary Mugenyi"
+              position="Director"
+              img="/images/team/kaka1.jpeg"
+              category="leadership"
+              role="Strategic Operations & Family Coordination"
+              highlights={[
+                "Coordinating multi-generational family involvement",
+                "Strategic operations oversight",
+                "Key stakeholder in project development",
+              ]}
+            />
+          </SimpleGrid>
         </Box>
 
         {/* Governance Section */}
         <Box mb={12}>
-          <Heading size="md" mb={6} color="purple.600" _dark={{ color: 'purple.400' }}>
+          <Heading 
+            size="md" 
+            mb={6} 
+            color="purple.600" 
+            _dark={{ color: 'purple.400' }}
+            textAlign="center"
+          >
             Legal & Governance Oversight
           </Heading>
-          <Flex className="-m-4 flex-wrap">
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
             <Member
               name="Ana Mugenyi"
               position="Judge of the High Court"
@@ -90,23 +140,7 @@ function Team() {
               category="governance"
               role="Tax & Regulatory Compliance"
             />
-          </Flex>
-        </Box>
-
-        {/* Operations Section */}
-        <Box>
-          <Heading size="md" mb={6} color="green.600" _dark={{ color: 'green.400' }}>
-            Operations & Development
-          </Heading>
-          <Flex className="-m-4 flex-wrap">
-            <Member
-              name="Mary Mugenyi"
-              position="Director"
-              img="/images/team/kaka1.jpeg"
-              category="operations"
-              role="Operational Oversight"
-            />
-          </Flex>
+          </SimpleGrid>
         </Box>
 
         {/* Future Advisory Note */}
@@ -127,7 +161,7 @@ function Team() {
             </Box>
           </SimpleGrid>
         </Box>
-      </Box>
+      </Container>
     </Box>
   )
 }
@@ -147,58 +181,141 @@ const Member = ({ name, position, img, role, category, highlights }: MemberProps
     governance: 'purple',
     operations: 'green',
   }
+  
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const nameColor = useColorModeValue('gray.800', 'white')
+  const positionColor = useColorModeValue('gray.600', 'gray.400')
+  const roleColor = useColorModeValue('blue.600', 'blue.300')
+  const highlightColor = useColorModeValue('gray.500', 'gray.400')
+  const borderColor = useColorModeValue('gray.200', 'gray.700')
 
   return (
-    <Box className="p-4 lg:w-1/2">
-      <Box
-        className="h-full flex-col items-center justify-center text-center sm:flex-row sm:justify-start sm:text-left"
-        bg="white"
-        _dark={{ bg: 'gray.800' }}
-        p={6}
-        borderRadius="lg"
-        boxShadow="md"
-        _hover={{
-          transform: 'translateY(-4px)',
-          boxShadow: 'xl',
-        }}
-        transition="all 0.3s"
-        display="flex"
+    <Box
+      bg={cardBg}
+      p={6}
+      borderRadius="xl"
+      boxShadow="lg"
+      border="1px"
+      borderColor={borderColor}
+      _hover={{
+        transform: 'translateY(-8px)',
+        boxShadow: '2xl',
+      }}
+      transition="all 0.3s"
+      h="full"
+    >
+      <Flex 
+        direction={{ base: 'column', md: category === 'leadership' ? 'row' : 'column' }}
+        align="center"
+        gap={6}
+        h="full"
       >
-        <Image
-          alt="team"
-          width="200"
-          height="300"
-          className="mb-4 flex-shrink-0 rounded-lg object-cover object-center sm:mb-0"
-          src={img}
-        />
-        <Box className="flex-grow sm:pl-8">
-          <Flex gap={2} mb={2} flexWrap="wrap" justify={{ base: 'center', sm: 'flex-start' }}>
-            {category && (
-              <Badge colorScheme={categoryColors[category]} fontSize="xs">
-                {category.charAt(0).toUpperCase() + category.slice(1)}
-              </Badge>
-            )}
-          </Flex>
-          <Text className="title-font text-lg font-medium mb-1">{name}</Text>
-          <Text className="mb-2 text-gray-600 font-semibold" _dark={{ color: 'gray.400' }}>
+        {/* Profile Image */}
+        <Box 
+          flexShrink={0}
+          textAlign="center"
+        >
+          <Box
+            position="relative"
+            w={{ base: '120px', md: category === 'leadership' ? '140px' : '120px' }}
+            h={{ base: '120px', md: category === 'leadership' ? '140px' : '120px' }}
+            mx="auto"
+            mb={4}
+          >
+            <Image
+              src={img}
+              alt={name}
+              width={200}
+              height={200}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '50%',
+              }}
+            />
+          </Box>
+          
+          {/* Category Badge */}
+          {category && (
+            <Badge 
+              colorScheme={categoryColors[category]} 
+              fontSize="xs"
+              px={3}
+              py={1}
+              borderRadius="full"
+              mb={2}
+            >
+              {category.charAt(0).toUpperCase() + category.slice(1)}
+            </Badge>
+          )}
+        </Box>
+
+        {/* Content */}
+        <Box 
+          flex={1}
+          textAlign={{ base: 'center', md: category === 'leadership' ? 'left' : 'center' }}
+        >
+          <Heading
+            as="h3"
+            size="md"
+            color={nameColor}
+            mb={2}
+            lineHeight="tight"
+          >
+            {name}
+          </Heading>
+          
+          <Text
+            fontSize="md"
+            fontWeight="semibold"
+            color={positionColor}
+            mb={3}
+          >
             {position}
           </Text>
+          
           {role && (
-            <Text className="text-sm text-blue-600 mb-2" _dark={{ color: 'blue.400' }}>
+            <Text 
+              fontSize="sm" 
+              color={roleColor}
+              fontStyle="italic"
+              mb={4}
+              lineHeight="relaxed"
+            >
               {role}
             </Text>
           )}
+          
+          {/* Highlights */}
           {highlights && highlights.length > 0 && (
-            <Box mt={2}>
-              {highlights.map((highlight, idx) => (
-                <Text key={idx} fontSize="xs" color="gray.500" mb={1}>
-                  • {highlight}
-                </Text>
-              ))}
+            <Box>
+              <Text 
+                fontSize="xs" 
+                fontWeight="bold" 
+                color={positionColor}
+                mb={2}
+                textTransform="uppercase"
+                letterSpacing="wide"
+              >
+                Key Highlights
+              </Text>
+              <VStack spacing={1} align={category === 'leadership' ? 'flex-start' : 'center'}>
+                {highlights.map((highlight, idx) => (
+                  <Text 
+                    key={idx} 
+                    fontSize="xs" 
+                    color={highlightColor}
+                    lineHeight="relaxed"
+                  >
+                    • {highlight}
+                  </Text>
+                ))}
+              </VStack>
             </Box>
           )}
         </Box>
-      </Box>
+      </Flex>
     </Box>
   )
 }

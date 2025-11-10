@@ -1,4 +1,6 @@
-import { Box, Flex, Heading, Text, SimpleGrid, Icon } from '@chakra-ui/react'
+'use client'
+
+import { Box, Flex, Heading, Text, SimpleGrid, Icon, useColorModeValue, Container } from '@chakra-ui/react'
 import { motion } from 'framer-motion'
 import { FaIndustry, FaPlane, FaHospital, FaTrophy } from 'react-icons/fa'
 
@@ -13,33 +15,49 @@ interface OpportunityCardProps {
   delay: number
 }
 
-const OpportunityCard = ({ icon, stat, title, description, color, delay }: OpportunityCardProps) => (
+const OpportunityCard = ({ icon, stat, title, description, color, delay }: OpportunityCardProps) => {
+  const cardBg = useColorModeValue('white', 'gray.800')
+  const cardHoverBg = useColorModeValue('gray.50', 'gray.700')
+  const borderColor = useColorModeValue('gray.200', 'gray.700')
+  const titleColor = useColorModeValue('gray.800', 'white')
+  const textColor = useColorModeValue('gray.600', 'gray.300')
+  
+  return (
   <MotionBox
     initial={{ opacity: 0, y: 50 }}
     whileInView={{ opacity: 1, y: 0 }}
     viewport={{ once: true }}
     // @ts-ignore
     transition={{ duration: 0.6, delay }}
-    bg="gray.800"
-    bgGradient={`linear(to-br, gray.800, ${color}.900)`}
+    bg={cardBg}
+    bgGradient={useColorModeValue(
+      `linear(to-br, white, ${color}.50)`, 
+      `linear(to-br, gray.800, ${color}.900)`
+    )}
     p={8}
     borderRadius="xl"
     boxShadow="2xl"
     _hover={{
       transform: 'translateY(-8px)',
       boxShadow: '2xl',
-      bgGradient: `linear(to-br, gray.700, ${color}.800)`,
+      bg: cardHoverBg,
     }}
     sx={{ transition: 'all 0.3s' }}
     border="1px"
-    borderColor="gray.700"
+    borderColor={borderColor}
   >
     <Flex direction="column" align="center" textAlign="center">
-      <Icon as={icon} w={12} h={12} color={`${color}.400`} mb={4} />
+      <Icon 
+        as={icon} 
+        w={12} 
+        h={12} 
+        color={useColorModeValue(`${color}.600`, `${color}.400`)} 
+        mb={4} 
+      />
       <Text
         fontSize="4xl"
         fontWeight="bold"
-        color={`${color}.300`}
+        color={useColorModeValue(`${color}.700`, `${color}.300`)}
         mb={2}
       >
         {stat}
@@ -48,32 +66,56 @@ const OpportunityCard = ({ icon, stat, title, description, color, delay }: Oppor
         as="h3"
         size="md"
         mb={4}
-        color="white"
+        color={titleColor}
       >
         {title}
       </Heading>
-      <Text color="gray.300" fontSize="sm" lineHeight="tall">
+      <Text color={textColor} fontSize="sm" lineHeight="tall">
         {description}
       </Text>
     </Flex>
   </MotionBox>
-)
+  )
+}
 
 function ConvergenceOpportunity() {
+  const sectionBg = useColorModeValue('gray.100', 'gray.900')
+  const headingColor = useColorModeValue('gray.800', 'white')
+  const subheadingColor = useColorModeValue('blue.600', 'blue.300')
+  const textColor = useColorModeValue('gray.600', 'gray.300')
+  const quoteColor = useColorModeValue('gray.500', 'gray.400')
+  
   return (
-    <Box id="convergence" className="body-font bg-gray-900 py-24">
-      <Box className="container mx-auto px-5">
-        <Flex className="mb-20 w-full flex-col text-center">
-          <Text className="title-font mb-2 text-xs font-medium tracking-widest text-blue-400">
+    <Box id="convergence" bg={sectionBg} py={24}>
+      <Container maxW="7xl">
+        <Flex mb={20} w="full" direction="column" textAlign="center">
+          <Text 
+            fontSize="xs" 
+            fontWeight="medium" 
+            letterSpacing="widest"
+            color={subheadingColor}
+            mb={2}
+            textTransform="uppercase"
+          >
             STRATEGIC TIMING
           </Text>
           <Heading
             as="h2"
-            className="title-font mb-4 text-3xl font-medium text-white sm:text-4xl"
+            fontSize={{ base: '3xl', sm: '4xl', lg: '5xl' }}
+            fontWeight="bold"
+            color={headingColor}
+            mb={6}
+            lineHeight="tight"
           >
             The Convergence Opportunity
           </Heading>
-          <Text className="mx-auto text-base leading-relaxed text-gray-300 lg:w-2/3">
+          <Text 
+            fontSize={{ base: 'md', lg: 'lg' }}
+            lineHeight="relaxed" 
+            color={textColor}
+            maxW="2xl"
+            mx="auto"
+          >
             A unique alignment of infrastructure development, economic growth, and critical healthcare
             needs creates an unprecedented investment opportunity in Uganda's emerging oil region.
           </Text>
@@ -115,12 +157,19 @@ function ConvergenceOpportunity() {
         </SimpleGrid>
 
         <Box mt={16} textAlign="center">
-          <Text fontSize="lg" color="gray.400" fontStyle="italic">
+          <Text 
+            fontSize="lg" 
+            color={quoteColor} 
+            fontStyle="italic"
+            maxW="2xl"
+            mx="auto"
+            lineHeight="relaxed"
+          >
             "When infrastructure, economic development, and critical needs converge,
             extraordinary investment opportunities emerge."
           </Text>
         </Box>
-      </Box>
+      </Container>
     </Box>
   )
 }

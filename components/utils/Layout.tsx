@@ -1,4 +1,4 @@
-import { Box, Flex } from "@chakra-ui/layout";
+import { Box, Flex } from "@chakra-ui/react";
 import SearchOptimization from "./SearchOptimization";
 import Header from "../Header";
 import Footer from "../Footer";

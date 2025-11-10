@@ -3,7 +3,12 @@
 # dependencies
 /node_modules
 /.pnp
-.pnp.js
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # testing
 /coverage
@@ -11,8 +16,6 @@
 # next.js
 /.next/
 /out/
-
-ymfltd/node_modules
 
 # production
 /build
@@ -25,17 +28,14 @@ ymfltd/node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
-# local env files
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# env files (can opt-in for committing if needed)
+.env*
 
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
-.env.local
-package-lock.json
+next-env.d.ts

@@ -1,3 +1,5 @@
+'use client'
+
 import { Box, Flex, Heading, Text, SimpleGrid, Badge } from '@chakra-ui/react'
 import { motion } from 'framer-motion'
 import { FaHandshake, FaHospitalAlt, FaPills, FaPaw, FaSeedling, FaMapMarkedAlt } from 'react-icons/fa'
@@ -22,7 +24,7 @@ const PartnerCard = ({ icon, title, description, status, statusColor, delay }: P
     // @ts-ignore
     transition={{ duration: 0.5, delay }}
     bg="white"
-    _dark={{ bg: 'gray.800' }}
+    _dark={{ bg: 'gray.800', borderColor: 'gray.700' }}
     p={6}
     borderRadius="lg"
     boxShadow="lg"
@@ -33,7 +35,6 @@ const PartnerCard = ({ icon, title, description, status, statusColor, delay }: P
     sx={{ transition: 'all 0.3s' }}
     border="1px"
     borderColor="gray.200"
-    _darkBorder={{ borderColor: 'gray.700' }}
     position="relative"
     overflow="hidden"
   >

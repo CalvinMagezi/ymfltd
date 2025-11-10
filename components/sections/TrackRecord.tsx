@@ -1,3 +1,5 @@
+'use client'
+
 import { Box, Flex, Heading, Text } from '@chakra-ui/react'
 import { motion } from 'framer-motion'
 import { FaCheckCircle } from 'react-icons/fa'
