@@ -87,7 +87,7 @@ function Header() {
                   <ColorModeSwitcher />
                 </Box>
               </Flex>
-              <ul className="flex w-full flex-1 flex-col space-y-4 pt-10 pb-3 text-lg font-semibold sm:max-w-md lg:w-auto lg:max-w-none lg:flex-row lg:items-center lg:justify-center lg:space-y-0 lg:space-x-8 lg:p-0 lg:text-sm">
+              <ul className="flex w-full flex-1 flex-col space-y-4 pt-10 pb-3 text-lg font-semibold sm:max-w-md lg:w-auto lg:max-w-none lg:flex-row lg:items-center lg:justify-center lg:space-y-0 lg:space-x-6 lg:p-0 lg:text-sm">
                 <li className="navbarLink">
                   <Link href="/">
                     <p className={styles.btn} onClick={() => setMenu(false)}>
@@ -96,16 +96,16 @@ function Header() {
                   </Link>
                 </li>
                 <li className="navbarLink">
-                  <Link href="/#about">
-                    <p className={styles.btn} onClick={() => setMenu(false)}>
-                      About Us
+                  <Link href="/#investment">
+                    <p className={`${styles.btn} text-blue-600`} onClick={() => setMenu(false)}>
+                      Investment
                     </p>
                   </Link>
                 </li>
                 <li className="navbarLink">
-                  <Link href="/#hoima">
+                  <Link href="/#partnerships">
                     <p className={styles.btn} onClick={() => setMenu(false)}>
-                      Hoima District
+                      Partnerships
                     </p>
                   </Link>
                 </li>
@@ -119,14 +119,14 @@ function Header() {
                 <li className="navbarLink">
                   <Link href="/#members">
                     <p className={styles.btn} onClick={() => setMenu(false)}>
-                      Members
+                      Team
                     </p>
                   </Link>
                 </li>
                 <li className="navbarLink">
                   <Link href="/#contact">
                     <p className={styles.btn} onClick={() => setMenu(false)}>
-                      Contact Us
+                      Contact
                     </p>
                   </Link>
                 </li>
