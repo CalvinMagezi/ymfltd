@@ -1,6 +1,7 @@
 import { sanityClient, urlFor } from '@/lib/sanity'
 import ProjectPageClient from '@/components/ProjectPageClient'
 import { Project } from '../../../typings'
+import Link from 'next/link'
 
 interface Props {
   params: Promise<{
@@ -39,9 +40,9 @@ export default async function ProjectPage({ params }: Props) {
         <p className="mt-4 text-gray-600">
           The project you're looking for doesn't exist or may have been removed.
         </p>
-        <a href="/" className="mt-6 inline-flex rounded border-0 bg-blue-500 py-2 px-6 text-lg text-white hover:bg-blue-600 focus:outline-none">
+        <Link href="/" className="mt-6 inline-flex rounded border-0 bg-blue-500 py-2 px-6 text-lg text-white hover:bg-blue-600 focus:outline-none">
           Back to Home
-        </a>
+        </Link>
       </div>
     )
   }

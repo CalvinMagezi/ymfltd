@@ -48,6 +48,7 @@ function Header() {
   const { isOpen, onToggle, onClose } = useDisclosure()
   
   const bgColor = useColorModeValue('white', 'gray.900')
+  const scrolledBgColor = useColorModeValue('rgba(255,255,255,0.95)', 'rgba(26,32,44,0.95)')
   const borderColor = useColorModeValue('gray.200', 'gray.700')
   const logoFilter = useColorModeValue('none', 'brightness(1.1)')
 
@@ -70,7 +71,7 @@ function Header() {
       boxShadow={isScrolled ? 'md' : 'none'}
       transition="all 0.3s"
       backdropFilter="blur(10px)"
-      backgroundColor={isScrolled ? useColorModeValue('rgba(255,255,255,0.95)', 'rgba(26,32,44,0.95)') : bgColor}
+      backgroundColor={isScrolled ? scrolledBgColor : bgColor}
     >
       <Box maxW="7xl" mx="auto" px={{ base: 4, md: 8 }}>
         <Flex h={16} alignItems="center" justifyContent="space-between">
