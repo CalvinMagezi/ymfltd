@@ -1,10 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource-variable/cormorant-garamond/wght.css";
-import "@fontsource-variable/cormorant-garamond/wght-italic.css";
-import "@fontsource-variable/nunito/wght.css";
+import localFont from "next/font/local";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+
+const cormorant = localFont({
+  src: [
+    { path: "./fonts/cormorant-garamond-latin-wght-normal.woff2", weight: "300 700", style: "normal" },
+    { path: "./fonts/cormorant-garamond-latin-wght-italic.woff2", weight: "300 700", style: "italic" },
+  ],
+  variable: "--font-cormorant",
+  display: "swap",
+  adjustFontFallback: "Times New Roman",
+  fallback: ["Garamond", "Times New Roman", "serif"],
+});
+const nunito = localFont({
+  src: [{ path: "./fonts/nunito-latin-wght-normal.woff2", weight: "200 1000", style: "normal" }],
+  variable: "--font-nunito",
+  display: "swap",
+  adjustFontFallback: "Arial",
+  fallback: ["Segoe UI", "Roboto", "Arial", "sans-serif"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.ymfltd.com"),
@@ -30,7 +46,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${cormorant.variable} ${nunito.variable}`}>
       <body className="min-h-dvh flex flex-col">
         <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 btn">
           Skip to content

@@ -67,9 +67,11 @@ export async function createExplorer(
     fetch(`${opts.base}/plan.json`).then((r) => r.json()),
     new Promise<HTMLImageElement>((res, rej) => {
       const im = new Image();
-      im.onload = () => res(im);
+      im.decoding = "async";
+      // Decode off the main thread before the image is drawn, so drawImage does not decode it synchronously.
+      im.onload = () => (im.decode ? im.decode().catch(() => undefined) : Promise.resolve()).then(() => res(im));
       im.onerror = rej;
-      im.src = `${opts.base}/ground.jpg`;
+      im.src = `${opts.base}/ground.webp`;
     }),
   ]);
   const F = ctx.frame, HW: number = F.half_w, HH: number = F.half_h, N: number = ctx.dem.n;
@@ -376,8 +378,9 @@ export async function createExplorer(
   };
 
   // ---------- labels ----------
-  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone };
+  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number };
   const labels: Lbl[] = [];
+  const placed: number[][] = [];
   let pickFn: (z: Zone | null) => void = () => {};
   const addLabel = (text: string, x: number, y: number, cls: string, zone?: Zone) => {
     const el = document.createElement(zone ? "button" : "div");
@@ -446,7 +449,9 @@ export async function createExplorer(
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    for (const l of labels) l.w = 0; // measure again: fonts or text size may have changed
   };
+  document.fonts?.ready.then(() => { for (const l of labels) l.w = 0; });
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
   resize();
@@ -465,11 +470,22 @@ export async function createExplorer(
     if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); }
     renderer.render(scene, camera);
     const w = canvas.clientWidth, h = canvas.clientHeight, dist = camera.position.distanceTo(controls.target);
+    // Labels are placed in order (zones first) and any that would overlap one already placed is hidden,
+    // so names stay readable and each one is a clear tap target on small screens.
+    placed.length = 0;
     for (const l of labels) {
       tmp.copy(l.v).project(camera);
-      const vis = labelsOn && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05 && !(l.zone && dist > 9000);
+      let vis = labelsOn && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05 && !(l.zone && dist > 9000);
+      const x = ((tmp.x + 1) / 2) * w, y = ((1 - tmp.y) / 2) * h;
+      if (vis) {
+        if (!l.w) { l.el.style.display = ""; l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
+        const bw = l.w || 60, bh = l.h || 24;
+        const box = [x - bw / 2 - 3, y - bh - 3, x + bw / 2 + 3, y + 3];
+        if (placed.some((q) => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) vis = false;
+        else placed.push(box);
+      }
       l.el.style.display = vis ? "" : "none";
-      if (vis) l.el.style.transform = `translate(${(((tmp.x + 1) / 2) * w).toFixed(1)}px, ${(((1 - tmp.y) / 2) * h).toFixed(1)}px) translate(-50%, -100%)`;
+      if (vis) l.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
       if (l.zone) l.el.style.opacity = l.zone.phase <= phase ? "1" : "0.72";
     }
     raf = requestAnimationFrame(loop);

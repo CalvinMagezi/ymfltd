@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import ExploreClient from "@/components/ExploreClient";
 
 export const metadata: Metadata = {
@@ -11,9 +10,7 @@ export default function ExplorePage() {
   return (
     <>
       <h1 className="sr-only">Explore New Kikwite Town in 3D</h1>
-      <Suspense fallback={<div className="h-[calc(100dvh-74px)] bg-paper" />}>
-        <ExploreClient />
-      </Suspense>
+      <ExploreClient />
       <section id="credits" className="wrap grid gap-3 pt-12 text-[14.5px] text-muted">
         <h2 className="text-[1.8rem] text-ink">About this model</h2>
         <p className="max-w-[75ch]">

@@ -57,7 +57,9 @@ export default async function ProjectPage({ params }: Props) {
                 src={scene ? scene.src : conceptImage(p.zone)}
                 alt={scene ? scene.alt : `Concept view of the ${p.name.toLowerCase()} area`}
                 fill
-                priority
+                loading="eager"
+                fetchPriority="high"
+                quality={60}
                 sizes="(min-width: 1024px) 640px, 100vw"
                 className="object-cover"
               />
@@ -93,7 +95,7 @@ export default async function ProjectPage({ params }: Props) {
             <p className="eyebrow">In the 3D model</p>
             {scene && (
               <div className="relative aspect-[16/10] overflow-hidden rounded-[10px] bg-paper-2">
-                <Image src={conceptImage(p.zone)} alt={`Concept view of the ${p.name.toLowerCase()} area in the 3D model`} fill sizes="320px" className="object-cover" />
+                <Image src={conceptImage(p.zone)} alt={`Concept view of the ${p.name.toLowerCase()} area in the 3D model`} fill quality={60} sizes="320px" className="object-cover" />
               </div>
             )}
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[15px]">

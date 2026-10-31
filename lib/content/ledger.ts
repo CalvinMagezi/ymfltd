@@ -1,4 +1,5 @@
-import plan from "@/public/explore/plan.json";
+// Written by tools/concept-model/public_export.py next to public/explore/plan.json; only the fields the ledger needs.
+import zones from "./ledger-zones.json";
 import { ZONE_SHORT } from "@/lib/content/zones";
 
 /**
@@ -12,7 +13,7 @@ type PlanZone = { id: string; acres: number; phase: number; color: string };
 const ORDER = ["forest", "wetland", "dairy", "housing", "golf", "utilities", "hotel", "hospital", "university", "arena", "bamboo", "heritage", "ecolodge", "agro", "commercial"];
 
 export const LEDGER: LedgerZone[] = ORDER.map((id) => {
-  const z = (plan.zones as PlanZone[]).find((q) => q.id === id)!;
+  const z = (zones as PlanZone[]).find((q) => q.id === id)!;
   return { id, name: ZONE_SHORT[id] ?? id, acres: z.acres, phase: z.phase, color: z.color };
 });
 

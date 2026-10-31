@@ -1,3 +1,8 @@
+/* scroll-craft engine stylesheet, vendored unmodified (see public/vendor/scrollcraft/SOURCE.txt).
+   Only the home page uses the engine, so it loads here rather than in globals.css. It goes into the
+   base layer (declared first by Tailwind in globals.css) so the site's own rules win over its resets. */
+@import "../public/vendor/scrollcraft/scrollcraft.css" layer(base);
+
 /*
  * Home: a printed feature in chapters. Each chapter lands on its own ground
  * (cream paper, royal navy, deep night, burnished gold) and holds it.
@@ -200,7 +205,7 @@ body:has(.home-root) > footer { display: none; }
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 1.12em;
-  color: var(--h-gold-deep);
+  color: #8a6420;
   white-space: nowrap;
 }
 .prose__lead .fig { font-size: 1.15em; }
@@ -279,8 +284,9 @@ body:has(.home-root) > footer { display: none; }
   gap: 2px 12px;
   padding: 14px 0 14px 18px;
   border-top: 1px solid rgba(245, 239, 225, 0.14);
-  opacity: 0.36;
-  transition: opacity 0.35s ease;
+  --ph-name: #a3a8b5;
+  --ph-ac: #b3955c;
+  --ph-note: #8f96a6;
 }
 .film__phases li::before {
   content: "";
@@ -295,14 +301,14 @@ body:has(.home-root) > footer { display: none; }
 .ch--film[data-phase="0"] li[data-ph="0"],
 .ch--film[data-phase="1"] li[data-ph="1"],
 .ch--film[data-phase="2"] li[data-ph="2"],
-.ch--film[data-phase="3"] li[data-ph="3"] { opacity: 1; }
+.ch--film[data-phase="3"] li[data-ph="3"] { --ph-name: #f5efe1; --ph-ac: #d3a74a; --ph-note: rgba(245, 239, 225, 0.82); }
 .ch--film[data-phase="0"] li[data-ph="0"]::before,
 .ch--film[data-phase="1"] li[data-ph="1"]::before,
 .ch--film[data-phase="2"] li[data-ph="2"]::before,
 .ch--film[data-phase="3"] li[data-ph="3"]::before { transform: none; }
-.film__ph-name { font-family: var(--font-display); font-size: 1.65rem; font-weight: 600; line-height: 1.1; }
-.film__ph-ac { font-size: 12.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--h-gold); }
-.film__ph-note { grid-column: 1 / -1; font-size: 14.5px; line-height: 1.45; color: rgba(245, 239, 225, 0.78); }
+.film__ph-name { font-family: var(--font-display); font-size: 1.65rem; font-weight: 600; line-height: 1.1; color: var(--ph-name); transition: color 0.35s ease; }
+.film__ph-ac { font-size: 12.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ph-ac); transition: color 0.35s ease; }
+.film__ph-note { grid-column: 1 / -1; font-size: 14.5px; line-height: 1.45; color: var(--ph-note); transition: color 0.35s ease; }
 .film__note { margin-top: 16px; font-size: 13.5px; line-height: 1.5; color: rgba(245, 239, 225, 0.62); max-width: 40ch; }
 @media (min-width: 861px) {
   .film__grid { grid-template-columns: minmax(230px, 0.8fr) minmax(0, 2.7fr); gap: clamp(24px, 3vw, 48px); }
@@ -330,7 +336,7 @@ body:has(.home-root) > footer { display: none; }
   font-weight: 800;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--h-gold-deep);
+  color: #7d5814;
 }
 .inter + .group-h { margin-top: 0; }
 .spreads { display: grid; gap: clamp(36px, 4vw, 64px); align-items: start; }

@@ -84,8 +84,8 @@ export default function Folio() {
   };
 
   return (
-    <aside className={`folio ${ch ? "is-on" : ""}`} aria-label="Where you are in the story">
-      <a href="#contents" className="folio__head no-underline">
+    <aside className={`folio ${ch ? "is-on" : ""}`} aria-label="Where you are in the story" aria-hidden={ch ? undefined : true}>
+      <a href="#contents" className="folio__head no-underline" aria-label={ch ? undefined : "Back to contents"} tabIndex={ch ? 0 : -1}>
         <span className="folio__num">{ch?.num ?? ""}</span>
         <span className="folio__title">{ch?.title ?? ""}</span>
       </a>

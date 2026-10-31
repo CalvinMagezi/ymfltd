@@ -22,7 +22,7 @@ export default function PageHead({ eyebrow, title, lead, image, children }: Prop
         </div>
         {image ? (
           <figure className="relative aspect-[16/10] overflow-hidden rounded-[14px] ring-1 ring-gold-strong/40">
-            <Image src={image.src} alt={image.alt} fill priority sizes="(min-width: 1024px) 560px, 100vw" className="object-cover" />
+            <Image src={image.src} alt={image.alt} fill loading="eager" fetchPriority="high" quality={60} sizes="(min-width: 1024px) 560px, 100vw" className="object-cover" />
             {image.label ? <figcaption className="aimp">{image.label}</figcaption> : null}
           </figure>
         ) : null}

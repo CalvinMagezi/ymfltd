@@ -37,9 +37,9 @@ export default function Header() {
       onFocusCapture={() => setHidden(false)}
     >
       <div className="wrap flex h-[68px] items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3 no-underline" aria-label="Yesero Mugenyi Foundation, home">
+        <Link href="/" className="flex items-center gap-3 no-underline">
           <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#f5efe1] ring-1 ring-gold-strong/60">
-            <Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-[2px]" priority />
+            <Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-[2px]" loading="eager" />
           </span>
           <span className="leading-tight">
             <span className="block font-display text-[19px] font-semibold tracking-[0.01em]">Yesero Mugenyi Foundation</span>
