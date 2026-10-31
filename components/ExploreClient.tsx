@@ -103,7 +103,7 @@ export default function ExploreClient() {
   }, [params, ready, zones, openZone]);
 
   useEffect(() => { exRef.current?.showLabels(labels); }, [labels]);
-  useEffect(() => { setBudgetOpen(window.innerWidth > 1024); }, []);
+  useEffect(() => { setBudgetOpen(window.matchMedia("(min-width: 1024px)").matches); }, []);
 
   const closeCard = () => {
     if (demoRef.current) clearTimeout(demoRef.current);
@@ -160,7 +160,7 @@ export default function ExploreClient() {
             <li key={z.id}>
               <button
                 type="button"
-                onClick={() => { openZone(z, true); if (window.innerWidth <= 1024) setBudgetOpen(false); }}
+                onClick={() => { openZone(z, true); if (!window.matchMedia("(min-width: 1024px)").matches) setBudgetOpen(false); }}
                 aria-current={selectedId === z.id}
                 className={`grid w-full grid-cols-[12px_1fr_auto] items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13.5px] leading-tight hover:bg-paper-2 aria-[current=true]:bg-paper-2 ${z.phase > phase ? "text-muted" : ""}`}
               >
