@@ -91,7 +91,7 @@ Checked on the production build with headless Chromium at 1440x900 and 390x844, 
 
 ## Performance pass (1 November 2026)
 
-Lighthouse 13, local production build, simulated mobile unless noted. Before: home 80 performance, 93 accessibility. After: home 76 to 88 across runs (desktop 99), inner pages 88 to 94, explore 62; accessibility, best practices and SEO 100 on every page.
+Lighthouse 12.8, local production build, simulated mobile unless noted. Before: home 80 performance, 93 accessibility. After: home 76 to 88 across runs (desktop 99), inner pages 88 to 94, explore 62; accessibility, best practices and SEO 100 on every page.
 
 - Fonts are self-hosted with `next/font/local` (`app/fonts/`), preloaded, with size-matched fallbacks so the swap does not shift text.
 - The home ledger reads `lib/content/ledger-zones.json` (four fields per zone) instead of the 180 KB `plan.json`, which had been shipping inside the home page JavaScript. `public_export.py` writes both.
