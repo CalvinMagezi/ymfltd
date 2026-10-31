@@ -96,6 +96,7 @@ Lighthouse 12.8, local production build, simulated mobile unless noted. Before: 
 - Fonts are self-hosted with `next/font/local` (`app/fonts/`), preloaded, with size-matched fallbacks so the swap does not shift text.
 - The home ledger reads `lib/content/ledger-zones.json` (four fields per zone) instead of the 180 KB `plan.json`, which had been shipping inside the home page JavaScript. `public_export.py` writes both.
 - Hero and page-head pictures use `fetchPriority="high"`; content photos use quality 60. The explore ground texture is WebP (83 KB, was a 238 KB JPEG).
-- Explore renders its panels and intro card on the server and starts the 3D work once the page is idle. Labels that would overlap one already placed are hidden, so names stay readable and tappable.
+- Explore renders its panels and intro card on the server and starts the 3D work once the page is idle. It draws only when something changes (camera, a flight, buildings rising), so a still view uses no CPU or GPU. Labels that would overlap one already placed are hidden, so names stay readable and tappable.
 - `experimental.inlineCss` was tried and left off (it copies the CSS into the RSC payload and scored worse).
-- What remains is mostly React and Next's own runtime on the main thread, and on explore the first WebGL frame, which is slow on the software renderer Lighthouse uses.
+- What remains is mostly React and Next's own runtime on the main thread, and on explore the first WebGL frame (shader compile and texture upload), which is slow and erratic on the software renderer Lighthouse uses. `renderer.compileAsync` was tried and made it worse.
+- PageSpeed Insights on the Vercel preview (mobile / desktop): home 91 / 99, projects 94 / 100, explore 63 mobile before the draw-on-change fix; accessibility, best practices and SEO 100.

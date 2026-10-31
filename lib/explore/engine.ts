@@ -381,6 +381,9 @@ export async function createExplorer(
   type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number };
   const labels: Lbl[] = [];
   const placed: number[][] = [];
+  // Draw only when something changed (camera, flight, rising buildings, a call to the API), so a still
+  // view costs nothing: cooler phones, longer batteries, and a free main thread.
+  let dirty = true;
   let pickFn: (z: Zone | null) => void = () => {};
   const addLabel = (text: string, x: number, y: number, cls: string, zone?: Zone) => {
     const el = document.createElement(zone ? "button" : "div");
@@ -450,8 +453,9 @@ export async function createExplorer(
     if (!w || !h) return;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
     for (const l of labels) l.w = 0; // measure again: fonts or text size may have changed
+    dirty = true;
   };
-  document.fonts?.ready.then(() => { for (const l of labels) l.w = 0; });
+  document.fonts?.ready.then(() => { for (const l of labels) l.w = 0; dirty = true; });
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
   resize();
@@ -463,11 +467,14 @@ export async function createExplorer(
       const t = Math.min(1, (now - flight.t0) / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       controls.target.lerpVectors(flight.fromT, flight.toT, e); camera.position.lerpVectors(flight.fromP, flight.toP, e);
       if (t >= 1) flight = null;
+      dirty = true;
     }
     controls.target.x = Math.max(-HW, Math.min(HW, controls.target.x));
     controls.target.z = Math.max(-HH, Math.min(HH, controls.target.z));
-    controls.update();
-    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); }
+    if (controls.update()) dirty = true;
+    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); dirty = true; }
+    if (!dirty) { raf = requestAnimationFrame(loop); return; }
+    dirty = false;
     renderer.render(scene, camera);
     const w = canvas.clientWidth, h = canvas.clientHeight, dist = camera.position.distanceTo(controls.target);
     // Labels are placed in order (zones first) and any that would overlap one already placed is hidden,
@@ -555,6 +562,10 @@ export async function createExplorer(
     },
   };
   (api as any).setSky = setSky;
+  for (const k of Object.keys(api)) {
+    const f = (api as any)[k];
+    if (typeof f === "function") (api as any)[k] = (...a: unknown[]) => { dirty = true; return f.apply(api, a); };
+  }
   api.setPhase(3, false);
   const [t0, p0] = overviewView();
   flyTo(t0, p0, 0);
