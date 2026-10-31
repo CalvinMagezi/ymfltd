@@ -1,26 +1,200 @@
 @import "tailwindcss";
+/* scroll-craft engine stylesheet, vendored unmodified (see public/vendor/scrollcraft/SOURCE.txt).
+   Loaded into the base layer so Tailwind utilities and the site's own rules win over its resets. */
+@import "../public/vendor/scrollcraft/scrollcraft.css" layer(base);
 
+/*
+ * Kitara: royal navy, cream paper and burnished gold, taken from the
+ * Kitara Heritage Library deck. Pages read like a printed book about a place:
+ * a serif display face, a warm humanist sans, thin rules and captions.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* scroll-craft colour and type roles, pointed at the Kitara palette */
+  --sc-canvas: var(--paper);
+  --sc-surface: var(--card);
+  --sc-ink: var(--ink);
+  --sc-ink-soft: var(--muted);
+  --sc-accent: var(--gold-strong);
+  --sc-accent-ink: #14223f;
+  --sc-font-display: var(--font-display);
+  --sc-font-text: var(--font-body);
+  --sc-font-mono: var(--font-body);
+  --paper: #f5efe1;
+  --paper-2: #ebe2cd;
+  --card: #fbf7ee;
+  --ink: #14223f;
+  --muted: #59617a;
+  --line: #dcd0b6;
+  --navy: #14223f;
+  --navy-2: #1d2d51;
+  --navy-3: #0c1730;
+  --navy-ink: #f5efe1;
+  --royal: #2346a8;
+  --gold: #8a6420;
+  --gold-strong: #d3a74a;
+  --gold-soft: #e9cf8f;
+  --gold-ink: #14223f;
+  --sky: #dfe5ee;
+  --ok: #2f7a4a;
+  --warn: #9a6816;
+  --info: #2d5aa8;
+  --font-display: "Cormorant Garamond Variable", "Cormorant Garamond", Garamond, "Times New Roman", serif;
+  --font-body: "Nunito Variable", "Nunito", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "Nunito Variable", "Nunito", "Segoe UI", Roboto, Arial, sans-serif;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #0e1830;
+    --paper-2: #15223f;
+    --card: #182849;
+    --ink: #f2ecdd;
+    --muted: #aab3c8;
+    --line: #2a3b62;
+    --navy: #0b1429;
+    --navy-2: #14223f;
+    --navy-3: #070e1e;
+    --navy-ink: #f5efe1;
+    --royal: #9fb4ff;
+    --gold: #e2bb62;
+    --gold-strong: #d3a74a;
+    --gold-soft: #e9cf8f;
+    --gold-ink: #14223f;
+    --sky: #16223a;
+    --ok: #6cc08a;
+    --warn: #e2bb62;
+    --info: #8fb0ef;
+    color-scheme: dark;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-navy-3: var(--navy-3);
+  --color-navy-ink: var(--navy-ink);
+  --color-royal: var(--royal);
+  --color-gold: var(--gold);
+  --color-gold-strong: var(--gold-strong);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-ink: var(--gold-ink);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+/* Element defaults live in the base layer, so component classes (.btn and friends) and utilities can override them. */
+@layer base {
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.6;
+    letter-spacing: normal;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-wrap: balance;
+    letter-spacing: -0.005em;
+    line-height: 1.08;
+  }
+  p { text-wrap: pretty; }
+  a { color: inherit; }
+  ::selection { background: color-mix(in srgb, var(--gold-strong) 40%, transparent); color: inherit; }
+  :focus-visible { outline: 2px solid var(--gold-strong); outline-offset: 3px; border-radius: 4px; }
+}
+
+@layer components {
+.wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+.eyebrow {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.rule { border-top: 1px solid var(--line); }
+.prose-ymf p + p { margin-top: 1em; }
+.prose-ymf p { max-width: 66ch; }
+
+/* The diagonal gold band from the library deck. */
+.kitara-band {
+  height: 6px;
+  background: repeating-linear-gradient(135deg, var(--gold-strong) 0 7px, transparent 7px 14px);
+  opacity: .85;
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 13px 20px; border-radius: 999px;
+  font-weight: 800; font-size: 15px; letter-spacing: .01em; line-height: 1; text-decoration: none;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.btn:hover { border-color: var(--muted); }
+.btn-primary { background: var(--gold-strong); border-color: transparent; color: var(--gold-ink); }
+.btn-primary:hover { background: var(--gold-soft); border-color: transparent; }
+.btn-royal { background: var(--navy); border-color: transparent; color: var(--navy-ink); }
+.btn-royal:hover { background: var(--navy-2); border-color: transparent; }
+.btn-on-dark { background: transparent; color: var(--navy-ink); border-color: color-mix(in srgb, var(--navy-ink) 35%, transparent); }
+.btn-on-dark:hover { border-color: var(--navy-ink); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-body); font-weight: 700; font-size: 12px; letter-spacing: .02em;
+  padding: 4px 9px; border-radius: 99px; border: 1px solid var(--line);
+  color: var(--muted); background: var(--paper); white-space: nowrap;
+}
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--dot, var(--muted)); }
+
+/* "Artist's impression" tag laid over generated pictures. */
+.aimp {
+  position: absolute; left: 12px; bottom: 12px; z-index: 2;
+  font: 700 11px/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase;
+  padding: 6px 9px; border-radius: 4px;
+  color: #f5efe1; background: rgba(12, 23, 48, .72);
+  backdrop-filter: blur(4px);
+}
+
+.num { font-variant-numeric: tabular-nums lining-nums; }
+.serif { font-family: var(--font-display); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; animation: none !important; }
+}
+
+/* 3D explorer labels (created by the engine) */
+.xlbl {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -100%);
+  white-space: nowrap; font: 700 12.5px/1.2 var(--font-body);
+  color: #fff; letter-spacing: .01em; padding: 0 0 12px; background: none; border: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.55);
+}
+.xlbl.zone { pointer-events: auto; cursor: pointer; }
+.xlbl.zone::after {
+  content: ""; position: absolute; left: 50%; bottom: 0; width: 7px; height: 7px; margin-left: -3.5px;
+  border-radius: 50%; background: var(--dot, #fff); box-shadow: 0 0 0 1.5px rgba(0,0,0,.6);
+}
+.xlbl.mark { font-weight: 600; font-size: 11.5px; color: #f5efe1; padding-bottom: 4px; }
+.xlbl.mark::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px;
+  border: 1.5px solid #f5efe1; transform: rotate(45deg) translateY(-1px);
 }

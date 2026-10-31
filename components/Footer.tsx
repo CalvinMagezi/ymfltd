@@ -1,85 +1,55 @@
-import React from 'react'
-import Link from 'next/link'
-import Image from 'next/image'
-import { Text } from '@chakra-ui/react'
+import Image from "next/image";
+import Link from "next/link";
+import { CONTACT } from "@/lib/content/site";
+import { NAV } from "@/lib/content/nav";
 
-function Footer() {
+export default function Footer() {
   return (
-    <footer className="body-font w-full">
-      <div className="container mx-auto flex flex-col items-center px-5 py-8 sm:flex-row">
-        <a className="title-font flex items-center justify-center font-medium md:justify-start">
-          <Image
-            src="/logo.png"
-            width="125"
-            height="100"
-            alt="YMF"
-            className="rounded-lg"
-          />
-          <Text className="ml-3 text-xl">The Yesero Mugenyi Foundation</Text>
-        </a>
-        <p className="mt-4 text-sm text-gray-400 sm:ml-4 sm:mt-0 sm:border-l-2 sm:border-gray-800 sm:py-2 sm:pl-4">
-          © 2022 YMFLTD
-        </p>
-        <span className="mt-4 inline-flex justify-center sm:ml-auto sm:mt-0 sm:justify-start">
-          <a className="text-gray-400">
-            <svg
-              fill="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-            >
-              <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"></path>
-            </svg>
-          </a>
-          <a className="ml-3 text-gray-400">
-            <svg
-              fill="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-            >
-              <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"></path>
-            </svg>
-          </a>
-          <a className="ml-3 text-gray-400">
-            <svg
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-            >
-              <rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect>
-              <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37zm1.5-4.87h.01"></path>
-            </svg>
-          </a>
-          <a className="ml-3 text-gray-400">
-            <svg
-              fill="currentColor"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="0"
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke="none"
-                d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"
-              ></path>
-              <circle cx="4" cy="4" r="2" stroke="none"></circle>
-            </svg>
-          </a>
-        </span>
+    <footer className="bg-navy text-navy-ink" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <div className="kitara-band" aria-hidden="true" />
+      <div className="wrap grid gap-10 py-16 md:grid-cols-[1.5fr_1fr_1fr]">
+        <div className="grid content-start gap-4">
+          <div className="flex items-center gap-4">
+            <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-[#f5efe1] ring-1 ring-gold-strong/60">
+              <Image src="/logo.png" alt="" fill sizes="64px" className="object-contain p-[3px]" />
+            </span>
+            <p className="font-display text-[26px] font-semibold leading-tight">Yesero Mugenyi<br />Foundation Ltd</p>
+          </div>
+          <p className="max-w-[44ch] text-[15px] text-navy-ink/80">
+            A family foundation planning New Kikwite Town on 1,280 acres southeast of Hoima, Uganda. Incorporated in Uganda in 2011.
+          </p>
+          <p className="max-w-[52ch] text-[13.5px] text-navy-ink/65">
+            Plans, layouts and pictures on this site are concepts for discussion. Pictures marked as artist&apos;s impressions were made
+            with AI image tools. None of it is an approved design, a surveyed boundary or an offer of investment.
+          </p>
+        </div>
+        <div>
+          <p className="eyebrow !text-gold-strong">Pages</p>
+          <ul className="mt-4 grid gap-2 text-[15px]">
+            <li><Link href="/" className="no-underline hover:underline">Home</Link></li>
+            {NAV.map((n) => (
+              <li key={n.href}>
+                <Link href={n.href} className="no-underline hover:underline">{n.label}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="eyebrow !text-gold-strong">Contact</p>
+          <ul className="mt-4 grid gap-2 text-[15px]">
+            <li className="select-all">{CONTACT.email}</li>
+            <li className="select-all num">{CONTACT.phone}</li>
+            <li>{CONTACT.address}</li>
+            <li className="text-navy-ink/75">Contact person: {CONTACT.person}</li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-white/10">
+        <div className="wrap flex flex-wrap justify-between gap-2 py-5 text-[13px] text-navy-ink/65">
+          <span>© {new Date().getFullYear()} Yesero Mugenyi Foundation Ltd</span>
+          <Link href="/explore#credits" className="no-underline hover:underline">Map, data and image credits</Link>
+        </div>
       </div>
     </footer>
-  )
+  );
 }
-
-export default Footer
