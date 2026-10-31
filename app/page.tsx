@@ -10,6 +10,7 @@ import ScrollCraftRoot from "@/components/home/ScrollCraftRoot";
 import Folio from "@/components/home/Folio";
 import LedgerPlate from "@/components/home/LedgerPlate";
 import FilmPlayer from "@/components/home/FilmPlayer";
+import BackToTop from "@/components/home/BackToTop";
 
 const CONTENTS = [
   { id: "ch-i", num: "I", title: "The land today" },
@@ -62,13 +63,17 @@ export default function Home() {
         <style>{`[data-sc-in],[data-sc-stagger]>*{opacity:1!important;transform:none!important}`}</style>
       </noscript>
       <Folio />
+      <BackToTop />
 
       {/* Title page: type on its own ground, the seal, no pictures above the fold */}
       <section className="ch ch--title" data-chapter="title" aria-labelledby="title-h">
+        <div className="title__sky" aria-hidden="true">
+          <Image src="/images/hill-sky.jpg" alt="" fill priority sizes="100vw" quality={50} className="object-cover object-[62%_38%]" />
+        </div>
         <div className="hwrap title">
           <div className="title__text">
             <p className="eyebrow title__eyebrow">The Yesero Mugenyi Foundation · Hoima, Bunyoro-Kitara</p>
-            <h1 id="title-h" className="title__h">New Kikwite Town</h1>
+            <h1 id="title-h" className="title__h" tabIndex={-1}>New Kikwite Town</h1>
             <p className="title__sub">
               A grandfather&apos;s land southeast of Hoima, planned as a working town for the families who will live and work there.
             </p>
@@ -244,8 +249,9 @@ export default function Home() {
             <Spread scene="hospital" slug="hospital-project" size="lg" />
             <Spread scene="school" slug="education-project" size="sm" className="spread--drop" />
           </div>
-          <div className="spreads spreads--b">
+          <div className="spreads spreads--pair">
             <Spread scene="library" slug="library-project" size="md" />
+            <Spread scene="museum" slug="museum-project" size="md" className="spread--drop-sm" />
           </div>
 
           <h3 className="group-h">Land and food</h3>
@@ -253,8 +259,9 @@ export default function Home() {
             <Spread scene="agro" slug="agro-industrial-park" size="lg" />
             <Spread scene="dairy" slug="agri-tourism-project" size="sm" className="spread--drop" />
           </div>
-          <div className="spreads spreads--b spreads--b-right">
+          <div className="spreads spreads--pair">
             <Spread scene="bamboo" slug="bamboo-project" size="md" />
+            <Spread scene="hemp" slug="hemp-project" size="md" className="spread--drop-sm" />
           </div>
 
           <h3 className="group-h">Town life</h3>
@@ -272,12 +279,13 @@ export default function Home() {
             <Spread scene="reserve" slug="animal-conservation-project" size="lg" />
             <Spread scene="ecolodge" slug="eco-tourism-project" size="sm" className="spread--drop" />
           </div>
-          <div className="spreads spreads--b">
+          <div className="spreads spreads--pair">
             <Spread scene="golf" slug="golf-course-project" size="md" />
+            <Spread scene="hotel" slug="hotel-project" size="md" className="spread--drop-sm" />
           </div>
 
           <p className="run-out">
-            The hotel shares the golf picture and the museum shares the library&apos;s. Industrial hemp is still research, so it has no picture yet.{" "}
+            Every picture here is an artist&apos;s impression of what the family hopes to build with partners.{" "}
             <Link href="/projects" className="run-link">See all sixteen projects and where each one stands</Link>.
           </p>
         </div>
@@ -356,8 +364,8 @@ export default function Home() {
             <Link href="/partner">Partner with us</Link>
           </nav>
           <p className="colophon__small">
-            Set in Cormorant Garamond and Nunito. Pictures marked as artist&apos;s impressions were made with AI image tools (Google Gemini) in
-            October 2026. The 3D model is built on open terrain and map data, see the{" "}
+            Set in Cormorant Garamond and Nunito. The sky behind the title page was photographed from the hill on the land in April 2020.
+            Pictures marked as artist&apos;s impressions were made with AI image tools (Google Gemini) in October 2026. The 3D model is built on open terrain and map data, see the{" "}
             <Link href="/explore#credits">credits</Link>. Plans, layouts and pictures on this site are concepts for discussion, not approved
             designs, surveyed boundaries or offers of investment. © {new Date().getFullYear()} Yesero Mugenyi Foundation Ltd.
           </p>

@@ -70,6 +70,6 @@ These were added in the November 2025 "investor platform" rewrite (commit `64084
 3. **State House letter (13 Nov 2024).** It records that the founder met the President on 5 Oct 2024 and that the Ministry of Health was directed to provide a consultant to assess the hospital's viability. Strong, true and documented, but it is government correspondence. Publish a line about it? Not on the site until the family says yes.
 4. **Library.** Google Maps shows a "Mugenyi Private Library" pin in Kikwite. Is there a building already, or only the book collection? The site currently says books are being collected.
 5. **Dairy herd.** Is 126 still the right number?
-6. **Contact details.** ada@ymfltd.com and +256 775 599 533 are shown publicly. Confirm both.
+6. **Contact details.** adamugenyi@yahoo.com (used while the ymfltd.com mailboxes are down, Calvin, 31 Oct 2026) and +256 775 599 533 are shown publicly. Switch back to a ymfltd.com address once mail works again.
 7. **Photographs.** Real photos of the dairy farm, the forest and the family would replace some concept views and make the site warmer.
 8. **AI pictures.** Is the family comfortable showing AI-made artist's impressions to partners? They are labelled on every picture and explained in the colophon. The dairy picture in particular shows an operating project, so a real photo of the farm should replace it first.

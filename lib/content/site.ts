@@ -2,7 +2,7 @@
 
 export const CONTACT = {
   person: "Ada Mugenyi, Managing Director",
-  email: "ada@ymfltd.com",
+  email: "adamugenyi@yahoo.com",
   phone: "+256 775 599 533",
   address: "Plot 26, Old Toro Road, Hoima, Uganda",
 };

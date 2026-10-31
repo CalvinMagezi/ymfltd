@@ -8,14 +8,33 @@ import { NAV } from "@/lib/content/nav";
 
 export default function Header() {
   const path = usePathname();
-  const home = path === "/";
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
   useEffect(() => setOpen(false), [path]);
+
+  // Tuck the bar away while reading down the page, bring it back as soon as the reader scrolls up.
+  useEffect(() => {
+    let last = window.scrollY, raf = 0;
+    const read = () => {
+      raf = 0;
+      const y = window.scrollY, dy = y - last;
+      if (y < 120) setHidden(false);
+      else if (dy > 6) setHidden(true);
+      else if (dy < -6) setHidden(false);
+      if (Math.abs(dy) > 6 || y < 120) last = y;
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(read); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, []);
 
   return (
     <header
-      className={`${home ? "relative" : "sticky top-0"} z-40 bg-navy text-navy-ink`}
+      className={`sticky top-0 z-40 bg-navy text-navy-ink transition-transform duration-300 ease-out motion-reduce:transition-none ${
+        hidden && !open ? "-translate-y-full" : "translate-y-0"
+      }`}
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+      onFocusCapture={() => setHidden(false)}
     >
       <div className="wrap flex h-[68px] items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-3 no-underline" aria-label="Yesero Mugenyi Foundation, home">
