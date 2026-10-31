@@ -4,15 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { PHASE_ACRES, LEDGER_TOTAL } from "@/lib/content/ledger";
 import { drawBar, drawGrid, zoneAt } from "./ledger-draw";
 
-const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-const smooth = (x: number) => x * x * (3 - 2 * x);
+import { filmPhase } from "./film-timing";
 
-/** Same timing as the rendered film frames (tools/concept-model/film): a short hold, then three eased phases. */
-export function filmPhase(p: number) {
-  const u = clamp01((p - 0.1) / 0.82) * 3;
-  const k = Math.min(2, Math.floor(u));
-  return u >= 3 ? 3 : k + smooth(Math.min(1, u - k));
-}
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 type Chapter = { num: string; title: string };
 
@@ -54,14 +48,11 @@ export default function Folio() {
       const film = document.querySelector<HTMLElement>("[data-ledger='film']");
       if (film) {
         const r = film.getBoundingClientRect();
-        // the engine's own pinned progress, computed from geometry so it is never a frame behind
-        const p = clamp01(-r.top / Math.max(r.height - vh, 1));
+        // follow the film player's eased playhead, so the ledger fills with the picture, not ahead of it
+        const eased = (window as unknown as { __ymfFilmP?: number }).__ymfFilmP;
+        const p = eased ?? clamp01(-r.top / Math.max(r.height - vh, 1));
         const f = filmPhase(p);
         for (let k = 1; k <= 3; k++) n += PHASE_ACRES[k] * clamp01(f - (k - 1));
-        const active = f < 0.25 ? 0 : Math.min(3, Math.ceil(f - 0.25));
-        if (film.dataset.phase !== String(active)) film.dataset.phase = String(active);
-        const started = p > 0.012 ? "1" : "0";
-        if (film.dataset.started !== started) film.dataset.started = started;
         if (r.bottom < 0) n = LEDGER_TOTAL;
       }
       const whole = Math.round(n);
@@ -76,10 +67,12 @@ export default function Folio() {
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(read); };
     const onResize = () => { lastFilled = -1; onScroll(); };
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("ymf:film", onScroll);
     window.addEventListener("resize", onResize);
     read();
     return () => {
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("ymf:film", onScroll);
       window.removeEventListener("resize", onResize);
       if (raf) cancelAnimationFrame(raf);
     };

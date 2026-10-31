@@ -37,7 +37,7 @@ export default function StoryPage() {
         </div>
         <figure className="grid gap-3">
           <div className="relative aspect-[4/5] overflow-hidden rounded-t-[190px] rounded-b-[14px] ring-1 ring-gold-strong/50 bg-navy">
-            <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill priority sizes="380px" className="object-cover" />
+            <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill priority sizes="380px" className="object-cover object-[50%_18%]" />
           </div>
           <figcaption className="text-[14px] text-navy-ink/70">Mr Yesero Mugenyi, founder. A Mubiito, prince of the royal clan of Bunyoro-Kitara.</figcaption>
         </figure>
@@ -65,8 +65,8 @@ export default function StoryPage() {
         <ul className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FAMILY.map((m) => (
             <li key={m.name} className="flex items-center gap-4 rounded-[14px] border border-line bg-card p-4">
-              <span className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-paper-2">
-                <Image src={m.img} alt="" fill sizes="80px" className="object-cover" />
+              <span className="relative h-24 w-24 shrink-0 overflow-hidden rounded-full bg-paper-2 ring-1 ring-gold-strong/50 ring-offset-2 ring-offset-card">
+                <Image src={m.img} alt={`Portrait of ${m.name}`} fill sizes="96px" className="object-cover" />
               </span>
               <span className="grid gap-1">
                 <span className="font-display text-[1.4rem] font-semibold leading-tight">{m.name}</span>

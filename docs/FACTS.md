@@ -39,7 +39,7 @@ These were added in the November 2025 "investor platform" rewrite (commit `64084
 | Bamboo | "grows for 120 years and does not need to be tended" | Removed. |
 | Museum image | Photo of the Kasubi Tombs (Buganda, not Bunyoro) | All stock photos replaced by views of our own 3D model. |
 | Hotel, housing, golf images | Photos of resorts abroad | Same. |
-| All project pictures (Oct 2026 update) | Views of the 3D model only | Photoreal artist's impressions made with Google Gemini for twelve projects, each labelled "Artist's impression" on the picture, with the 3D model view kept beside it. Bamboo, hemp, sports arena and technology still use the model view. Replace with real photographs as they become available. |
+| All project pictures (Oct 2026 update) | Views of the 3D model only | Photoreal artist's impressions made with Google Gemini, redone the same night in a modern smart-town style (paved streets, contemporary buildings, solar) after family feedback. Fifteen of sixteen projects have one, each labelled "Artist's impression"; industrial hemp keeps the 3D model view. An aerial of the whole town opens chapter IV. Replace with real photographs as they become available. |
 
 ## 3. Kept, with its source
 

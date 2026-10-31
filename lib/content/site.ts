@@ -22,12 +22,12 @@ export interface FamilyMember {
 
 /** Names and titles as the family listed them in 2022, with one correction (see docs/FACTS.md). */
 export const FAMILY: FamilyMember[] = [
-  { name: "Ada Mugenyi", title: "Managing Director", img: "/images/team/mom1.jpeg" },
-  { name: "Mary Mugenyi", title: "Director", img: "/images/team/kaka1.jpeg" },
-  { name: "Ana Mugenyi", title: "Judge of the High Court", img: "/images/team/ana-mugenyi1.jpeg" },
-  { name: "Ham Mugenyi", title: "Lawyer, Chairman of the Uganda Development Corporation Board", img: "/images/team/ham-mugenyi1.png" },
-  { name: "Yese Mugenyi", title: "Lawyer", img: "/images/team/yese-mugenyi1.png" },
-  { name: "Asa Mugenyi", title: "Lawyer, former Chairperson of the Tax Appeals Tribunal", img: "/images/team/asa-mugenyi1.png" },
+  { name: "Ada Mugenyi", title: "Managing Director", img: "/images/team/face/mom.jpg" },
+  { name: "Mary Mugenyi", title: "Director", img: "/images/team/face/kaka.jpg" },
+  { name: "Ana Mugenyi", title: "Judge of the High Court", img: "/images/team/face/ana-mugenyi.jpg" },
+  { name: "Ham Mugenyi", title: "Lawyer, Chairman of the Uganda Development Corporation Board", img: "/images/team/face/ham-mugenyi.jpg" },
+  { name: "Yese Mugenyi", title: "Lawyer", img: "/images/team/face/yese-mugenyi.jpg" },
+  { name: "Asa Mugenyi", title: "Lawyer, former Chairperson of the Tax Appeals Tribunal", img: "/images/team/face/asa-mugenyi.jpg" },
 ];
 
 export const TIMELINE = [

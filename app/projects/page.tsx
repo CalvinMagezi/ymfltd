@@ -20,7 +20,7 @@ export default function ProjectsPage() {
       eyebrow="Projects"
       title="Sixteen projects, one town"
       lead={<p>Some are running today, some are in planning with partners, and most are waiting for the right partners and funding. Each one says plainly where it stands.</p>}
-      image={{ src: SCENES.town.src, alt: SCENES.town.alt, label: "Artist's impression" }}
+      image={{ src: SCENES.aerial.src, alt: SCENES.aerial.alt, label: "Artist's impression" }}
     />
     <div className="wrap pt-12">
       <section aria-label="What each status means" className="rounded-[14px] border border-line bg-card p-5">

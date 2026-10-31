@@ -9,6 +9,7 @@ import { StatusChip } from "@/components/ProjectBits";
 import ScrollCraftRoot from "@/components/home/ScrollCraftRoot";
 import Folio from "@/components/home/Folio";
 import LedgerPlate from "@/components/home/LedgerPlate";
+import FilmPlayer from "@/components/home/FilmPlayer";
 
 const CONTENTS = [
   { id: "ch-i", num: "I", title: "The land today" },
@@ -145,7 +146,7 @@ export default function Home() {
           <div className="spread-row spread-row--portrait" data-sc-act="flow">
             <figure className="portrait">
               <div className="portrait__frame" data-sc-reveal="iris" data-sc-reveal-at="0.12 0.42">
-                <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill sizes="(min-width: 1100px) 420px, 80vw" className="object-cover" />
+                <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill sizes="(min-width: 1100px) 420px, 80vw" className="object-cover object-[50%_18%]" />
               </div>
               <figcaption className="portrait__cap">Mr Yesero Mugenyi, founder. A Mubiito, prince of the royal clan of Bunyoro-Kitara.</figcaption>
             </figure>
@@ -208,11 +209,7 @@ export default function Home() {
                 <source media="(max-width: 860px)" srcSet="/film/m/00.webp" />
                 <img className="film__poster" src="/film/d/00.webp" alt="The land today in the concept model: forest, wetland and the dairy on green hills" />
               </picture>
-              <canvas
-                data-seq-desktop="/film/d/{ii}.webp:72:0"
-                data-seq-mobile="/film/m/{ii}.webp:72:0"
-                aria-hidden="true"
-              />
+              <FilmPlayer desktop="/film/d/{ii}.webp" mobile="/film/m/{ii}.webp" count={72} />
             </figure>
           </div>
         </div>
@@ -230,6 +227,18 @@ export default function Home() {
             </p>
           </header>
 
+          <figure className="pano" data-sc-in>
+            <div className="pano__frame" data-sc-act="flow">
+              <div className="spread__par" data-sc-parallax="-0.9">
+                <Image src={SCENES.aerial.src} alt={SCENES.aerial.alt} fill sizes="(min-width: 1100px) 1170px, 100vw" className="object-cover" />
+              </div>
+              <span className="aimp">Artist&apos;s impression</span>
+            </div>
+            <figcaption className="spread__cap">
+              <span className="spread__text">{SCENES.aerial.caption} A picture of the ambition, not the plan: the 3D model in chapter III shows where things go.</span>
+            </figcaption>
+          </figure>
+
           <h3 className="group-h">Care and learning</h3>
           <div className="spreads spreads--a">
             <Spread scene="hospital" slug="hospital-project" size="lg" />
@@ -244,11 +253,18 @@ export default function Home() {
             <Spread scene="agro" slug="agro-industrial-park" size="lg" />
             <Spread scene="dairy" slug="agri-tourism-project" size="sm" className="spread--drop" />
           </div>
+          <div className="spreads spreads--b spreads--b-right">
+            <Spread scene="bamboo" slug="bamboo-project" size="md" />
+          </div>
 
           <h3 className="group-h">Town life</h3>
           <div className="spreads spreads--a">
             <Spread scene="town" slug="shopping-center-project" size="lg" />
             <Spread scene="homes" slug="housing-project" size="sm" className="spread--drop" />
+          </div>
+          <div className="spreads spreads--pair">
+            <Spread scene="arena" slug="sports-arena-project" size="md" />
+            <Spread scene="solar" slug="technology-projects" size="md" className="spread--drop-sm" />
           </div>
 
           <h3 className="group-h">Nature and visitors</h3>
@@ -261,7 +277,7 @@ export default function Home() {
           </div>
 
           <p className="run-out">
-            The bamboo, hemp research, sports arena and solar network are in the 3D model.{" "}
+            The hotel shares the golf picture and the museum shares the library&apos;s. Industrial hemp is still research, so it has no picture yet.{" "}
             <Link href="/projects" className="run-link">See all sixteen projects and where each one stands</Link>.
           </p>
         </div>
