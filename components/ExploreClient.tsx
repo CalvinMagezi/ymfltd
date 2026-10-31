@@ -115,7 +115,7 @@ export default function ExploreClient() {
   const total = zones.reduce((s, z) => s + z.acres, 0);
 
   return (
-    <div className="relative h-[calc(100dvh-4rem-env(safe-area-inset-top,0px))] min-h-[520px] overflow-hidden bg-[var(--sky)]">
+    <div className="relative h-[calc(100dvh-74px-env(safe-area-inset-top,0px))] min-h-[520px] overflow-hidden bg-[var(--sky)]">
       <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full touch-none" aria-label="3D concept model of New Kikwite Town. Drag to turn, scroll or pinch to zoom." />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
 
@@ -126,7 +126,7 @@ export default function ExploreClient() {
       )}
 
       {/* Phase control */}
-      <div className="absolute left-4 top-4 z-10 grid w-[min(330px,calc(100%-2rem))] gap-2 rounded-xl border border-line bg-card/95 p-3 shadow-lg backdrop-blur" style={{ left: "max(16px, env(safe-area-inset-left, 0px))" }}>
+      <div className="absolute left-4 top-4 z-10 grid w-[min(330px,calc(100%-2rem))] gap-2 rounded-[14px] border border-line bg-card/95 p-3 shadow-lg backdrop-blur" style={{ left: "max(16px, env(safe-area-inset-left, 0px))" }}>
         <div className="grid grid-cols-4 overflow-hidden rounded-lg border border-line" role="group" aria-label="Show the town at">
           {PHASE_LABEL.map((l, i) => (
             <button
@@ -147,7 +147,7 @@ export default function ExploreClient() {
       <aside
         aria-label="Draft land budget"
         hidden={!budgetOpen}
-        className="absolute right-4 top-4 z-20 flex max-h-[calc(100%-2rem)] w-[min(320px,calc(100%-2rem))] flex-col rounded-xl border border-line bg-card/95 shadow-lg backdrop-blur max-lg:bottom-[4.25rem] max-lg:top-auto max-lg:max-h-[55%]"
+        className="absolute right-4 top-4 z-20 flex max-h-[calc(100%-2rem)] w-[min(320px,calc(100%-2rem))] flex-col rounded-[14px] border border-line bg-card/95 shadow-lg backdrop-blur max-lg:bottom-[4.25rem] max-lg:top-auto max-lg:max-h-[55%]"
         style={{ right: "max(16px, env(safe-area-inset-right, 0px))" }}
       >
         <header className="flex items-baseline justify-between gap-2 border-b border-line px-4 py-3">
@@ -176,7 +176,7 @@ export default function ExploreClient() {
 
       {/* Info card */}
       {card && (
-        <section aria-live="polite" className="absolute bottom-16 left-1/2 z-10 grid w-[min(560px,calc(100%-2rem))] -translate-x-1/2 gap-2 rounded-xl border border-line bg-card/95 p-4 pr-10 shadow-lg backdrop-blur max-sm:bottom-[4.25rem] max-sm:max-h-[42%] max-sm:overflow-y-auto">
+        <section aria-live="polite" className="absolute bottom-16 left-1/2 z-10 grid w-[min(560px,calc(100%-2rem))] -translate-x-1/2 gap-2 rounded-[14px] border border-line bg-card/95 p-4 pr-10 shadow-lg backdrop-blur max-sm:bottom-[4.25rem] max-sm:max-h-[42%] max-sm:overflow-y-auto">
           <button type="button" onClick={closeCard} className="absolute right-2 top-2 rounded px-2 py-1 text-lg leading-none text-muted hover:bg-paper-2" aria-label="Close">×</button>
           {card.kind === "intro" && (
             <>

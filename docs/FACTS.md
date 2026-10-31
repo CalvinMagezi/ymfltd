@@ -39,6 +39,7 @@ These were added in the November 2025 "investor platform" rewrite (commit `64084
 | Bamboo | "grows for 120 years and does not need to be tended" | Removed. |
 | Museum image | Photo of the Kasubi Tombs (Buganda, not Bunyoro) | All stock photos replaced by views of our own 3D model. |
 | Hotel, housing, golf images | Photos of resorts abroad | Same. |
+| All project pictures (Oct 2026 update) | Views of the 3D model only | Photoreal artist's impressions made with Google Gemini for twelve projects, each labelled "Artist's impression" on the picture, with the 3D model view kept beside it. Bamboo, hemp, sports arena and technology still use the model view. Replace with real photographs as they become available. |
 
 ## 3. Kept, with its source
 
@@ -71,3 +72,4 @@ These were added in the November 2025 "investor platform" rewrite (commit `64084
 5. **Dairy herd.** Is 126 still the right number?
 6. **Contact details.** ada@ymfltd.com and +256 775 599 533 are shown publicly. Confirm both.
 7. **Photographs.** Real photos of the dairy farm, the forest and the family would replace some concept views and make the site warmer.
+8. **AI pictures.** Is the family comfortable showing AI-made artist's impressions to partners? They are labelled on every picture and explained in the colophon. The dairy picture in particular shows an operating project, so a real photo of the farm should replace it first.

@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import "@fontsource-variable/epilogue";
-import "@fontsource-variable/source-sans-3";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource-variable/cormorant-garamond/wght.css";
+import "@fontsource-variable/cormorant-garamond/wght-italic.css";
+import "@fontsource-variable/nunito/wght.css";
 import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -24,8 +23,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f5ef" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1612" },
+    { media: "(prefers-color-scheme: light)", color: "#14223f" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1429" },
   ],
 };
 
@@ -37,7 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           Skip to content
         </a>
         <Header />
-        <main id="main" className="flex-1">
+        <main id="main" className="flex-1 pb-24 has-[.no-foot-gap]:pb-0">
           {children}
         </main>
         <Footer />

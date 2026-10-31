@@ -32,7 +32,7 @@ export default function EnquiryForm() {
 
   if (state === "sent") {
     return (
-      <div role="status" className="rounded-xl border border-line bg-card p-6">
+      <div role="status" className="rounded-[14px] border border-line bg-card p-6">
         <p className="text-lg font-semibold">Thank you. Your message has been sent.</p>
         <p className="mt-1 text-muted">Ada Mugenyi or a member of the family will reply by email.</p>
       </div>

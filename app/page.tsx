@@ -1,185 +1,352 @@
 import Image from "next/image";
 import Link from "next/link";
-import { PROJECTS, THEMES, type Theme } from "@/lib/content/projects";
-import { KEY_FACTS } from "@/lib/content/site";
-import { PHASES } from "@/lib/content/zones";
+import "./home.css";
+import { projectBySlug } from "@/lib/content/projects";
+import { CONTACT, HOIMA_FACTS } from "@/lib/content/site";
+import { SCENES, type SceneKey } from "@/lib/content/scenes";
+import { PHASE_ACRES, LEDGER_TOTAL } from "@/lib/content/ledger";
 import { StatusChip } from "@/components/ProjectBits";
+import ScrollCraftRoot from "@/components/home/ScrollCraftRoot";
+import Folio from "@/components/home/Folio";
+import LedgerPlate from "@/components/home/LedgerPlate";
 
-const THEME_ORDER: Theme[] = ["land", "health", "nature", "town"];
-const THEME_IMAGE: Record<Theme, string> = { land: "dairy", health: "heritage", nature: "forest", town: "housing" };
+const CONTENTS = [
+  { id: "ch-i", num: "I", title: "The land today" },
+  { id: "ch-ii", num: "II", title: "A grandfather's promise" },
+  { id: "ch-iii", num: "III", title: "The land becomes the town" },
+  { id: "ch-iv", num: "IV", title: "What will stand here" },
+  { id: "ch-v", num: "V", title: "Hoima is rising" },
+  { id: "colophon", num: "", title: "Build it with us" },
+];
+
+const FILM_PHASES = [
+  { name: "Today", note: "The dairy farm, the forest and the wetland." },
+  { name: "Phase 1", note: "The hospital, golf course, hotel, solar farm and the first homes." },
+  { name: "Phase 2", note: "Schools and university, the sports arena, library and museum, eco-lodge and bamboo." },
+  { name: "Phase 3", note: "The agro-industrial park and the town centre." },
+];
+
+/** A picture spread in chapter IV: one generated scene tied to one project. */
+function Spread({ scene, slug, size = "lg", className = "" }: { scene: SceneKey; slug: string; size?: "lg" | "md" | "sm"; className?: string }) {
+  const s = SCENES[scene];
+  const p = projectBySlug(slug)!;
+  const sizes = size === "lg" ? "(min-width: 1100px) 760px, 100vw" : size === "md" ? "(min-width: 1100px) 560px, 100vw" : "(min-width: 1100px) 420px, 100vw";
+  return (
+    <figure className={`spread spread--${size} ${className}`} data-sc-in>
+      <div className="spread__frame" data-sc-act="flow">
+        <div className="spread__par" data-sc-parallax="-0.7">
+          <Image src={s.src} alt={s.alt} fill sizes={sizes} className="object-cover" />
+        </div>
+        <span className="aimp">Artist&apos;s impression</span>
+      </div>
+      <figcaption className="spread__cap">
+        <span className="spread__head">
+          <Link href={`/projects/${p.slug}`}>{p.name}</Link>
+          <StatusChip status={p.status} />
+        </span>
+        <span className="spread__text">{p.summary}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
+const countable = (f: string) => /^[\d,]+$/.test(f);
 
 export default function Home() {
+  const hoima = HOIMA_FACTS.filter((f) => ["people in Hoima City", "Kabalega airport opens", "seats at Hoima City Stadium", "Ugandans working directly in oil", "beds at the regional referral hospital"].includes(f.label));
+
   return (
-    <>
-      {/* Hero: the concept model is the picture */}
-      <section className="relative isolate overflow-hidden bg-forest text-forest-ink">
-        <Image
-          src="/images/concept/hero.jpg"
-          alt="Concept view of New Kikwite Town on the hills southeast of Hoima, from the 3D model"
-          fill
-          priority
-          sizes="100vw"
-          className="-z-10 object-cover object-[65%_55%]"
-        />
-        <div className="absolute inset-0 -z-10 bg-[#0d2418]/70 md:bg-transparent md:bg-gradient-to-r md:from-[#0d2418]/90 md:via-[#0d2418]/55 md:to-transparent" />
-        <div className="wrap grid min-h-[min(78vh,720px)] content-center gap-6 py-20">
-          <p className="eyebrow !text-forest-ink/80">Yesero Mugenyi Foundation · Hoima, Uganda</p>
-          <h1 className="max-w-[17ch] text-[clamp(2.2rem,5.2vw,4.1rem)] font-bold leading-[1.04]">
-            A working town on two square miles of family land
-          </h1>
-          <p className="max-w-[54ch] text-[clamp(1.05rem,1.6vw,1.25rem)] text-forest-ink/90">
-            New Kikwite Town is planned on 1,280 acres southeast of Hoima's city centre: farms and food processing, a hospital,
-            schools, a forest reserve, homes and places to visit, built in phases by one family over generations.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/explore" className="btn btn-primary">Explore the town in 3D</Link>
-            <Link href="/projects" className="btn btn-on-dark">See all 16 projects</Link>
-          </div>
-          <p className="font-mono text-[12px] text-forest-ink/70">Concept model for discussion, not an approved design.</p>
-        </div>
-      </section>
+    <ScrollCraftRoot className="home-root no-foot-gap">
+      <noscript>
+        <style>{`[data-sc-in],[data-sc-stagger]>*{opacity:1!important;transform:none!important}`}</style>
+      </noscript>
+      <Folio />
 
-      {/* What is real today */}
-      <section className="wrap py-16" aria-labelledby="facts-h">
-        <div className="grid gap-2">
-          <p className="eyebrow">Where things stand</p>
-          <h2 id="facts-h" className="text-[clamp(1.6rem,3vw,2.2rem)] font-bold">The land, the farm and the forest are already here</h2>
-        </div>
-        <dl className="mt-8 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
-          {KEY_FACTS.map((f) => (
-            <div key={f.text} className="grid content-start gap-2 bg-card p-5">
-              <dt className="flex items-baseline gap-2">
-                <span className="num font-display text-4xl font-bold">{f.value}</span>
-                <span className="font-mono text-sm text-muted">{f.unit}</span>
-              </dt>
-              <dd className="text-[15px] leading-snug text-muted">{f.text}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {/* Explore band */}
-      <section className="bg-paper-2" aria-labelledby="explore-h">
-        <div className="wrap grid items-center gap-10 py-16 lg:grid-cols-[1.25fr_1fr]">
-          <Link href="/explore" className="group relative block aspect-[16/10] overflow-hidden rounded-xl border border-line">
-            <Image
-              src="/images/concept/hospital.jpg"
-              alt="Close view of the gateway area in the 3D concept model, with the hospital and library"
-              fill
-              sizes="(min-width: 1024px) 640px, 100vw"
-              className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-            />
-            <span className="absolute bottom-3 left-3 rounded-lg bg-black/60 px-3 py-2 font-mono text-[12px] text-white">Open the 3D model</span>
-          </Link>
-          <div className="grid gap-4">
-            <p className="eyebrow">The plan in 3D</p>
-            <h2 id="explore-h" className="text-[clamp(1.6rem,3vw,2.2rem)] font-bold">Walk the plan before anything is built</h2>
-            <p className="text-muted">
-              The model places every project on the real hills and valleys of the land. Turn it, zoom in, tap any area to read about it,
-              and switch between today and each phase to watch the town grow.
+      {/* Title page: type on its own ground, the seal, no pictures above the fold */}
+      <section className="ch ch--title" data-chapter="title" aria-labelledby="title-h">
+        <div className="hwrap title">
+          <div className="title__text">
+            <p className="eyebrow title__eyebrow">The Yesero Mugenyi Foundation · Hoima, Bunyoro-Kitara</p>
+            <h1 id="title-h" className="title__h">New Kikwite Town</h1>
+            <p className="title__sub">
+              A grandfather&apos;s land southeast of Hoima, planned as a working town for the families who will live and work there.
             </p>
-            <p className="text-muted">
-              It is a first layout for the family to discuss and change. A surveyed boundary and drone capture of the land come next.
-            </p>
-            <div><Link href="/explore" className="btn btn-primary">Explore in 3D</Link></div>
+            <p className="title__ded">For Mr Yesero Mugenyi, who gathered this land for his children and grandchildren.</p>
+          </div>
+          <div className="title__seal" aria-hidden="true">
+            <span className="title__disc">
+              <Image src="/logo.png" alt="" fill sizes="(min-width: 1100px) 340px, 200px" className="object-contain" priority />
+            </span>
           </div>
         </div>
-      </section>
-
-      {/* Projects by theme */}
-      <section className="wrap py-16" aria-labelledby="projects-h">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="grid gap-2">
-            <p className="eyebrow">Projects</p>
-            <h2 id="projects-h" className="text-[clamp(1.6rem,3vw,2.2rem)] font-bold">Sixteen projects, one town</h2>
-          </div>
-          <Link href="/projects" className="btn">All projects</Link>
-        </div>
-        <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {THEME_ORDER.map((t) => {
-            const list = PROJECTS.filter((p) => p.theme === t);
-            return (
-              <li key={t} className="grid min-w-0 grid-rows-[auto_auto_1fr] overflow-hidden rounded-xl border border-line bg-card">
-                <div className="relative aspect-[16/10] bg-paper-2">
-                  <Image src={`/images/concept/${THEME_IMAGE[t]}.jpg`} alt="" fill sizes="(min-width: 1024px) 290px, (min-width: 640px) 50vw, 100vw" className="object-cover" />
-                </div>
-                <div className="grid gap-1 px-4 pt-4">
-                  <h3 className="text-lg font-semibold">{THEMES[t].name}</h3>
-                  <p className="text-[14.5px] leading-snug text-muted">{THEMES[t].line}</p>
-                </div>
-                <ul className="grid content-start gap-0 p-2 pt-3">
-                  {list.map((p) => (
-                    <li key={p.slug}>
-                      <Link href={`/projects/${p.slug}`} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-[15px] no-underline hover:bg-paper-2">
-                        <span className="min-w-0">{p.name}</span>
-                        <StatusChip status={p.status} />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      {/* Phases */}
-      <section className="bg-paper-2" aria-labelledby="phases-h">
-        <div className="wrap py-16">
-          <div className="grid gap-2">
-            <p className="eyebrow">How it comes together</p>
-            <h2 id="phases-h" className="text-[clamp(1.6rem,3vw,2.2rem)] font-bold">Built in phases, as partners join</h2>
-            <p className="max-w-[62ch] text-muted">
-              Each phase starts when its partners and funding are in place. The order below is the family's current thinking, not a timetable.
-            </p>
-          </div>
-          <ol className="mt-10 grid gap-px overflow-hidden rounded-xl border border-line bg-line md:grid-cols-4">
-            {PHASES.map((ph, i) => (
-              <li key={ph.name} className="grid content-start gap-2 bg-card p-5">
-                <span className="font-mono text-[12px] text-muted">{i === 0 ? "Now" : `Step ${i}`}</span>
-                <h3 className="text-lg font-semibold">{ph.name}</h3>
-                <p className="text-[15px] leading-snug text-muted">{ph.note}</p>
+        <nav id="contents" className="hwrap contents" aria-label="Contents">
+          <p className="eyebrow contents__h">Contents</p>
+          <ol className="contents__list">
+            {CONTENTS.map((c) => (
+              <li key={c.id}>
+                <a href={`#${c.id}`}>
+                  <span className="contents__num">{c.num || "·"}</span>
+                  <span className="contents__t">{c.title}</span>
+                </a>
               </li>
             ))}
           </ol>
+        </nav>
+      </section>
+
+      {/* I. The land today */}
+      <section id="ch-i" className="ch ch--paper" data-chapter="i" data-num="I" data-title="The land today" data-ledger="today" aria-labelledby="ch-i-h">
+        <div className="hwrap">
+          <header className="inter">
+            <span className="inter__num" aria-hidden="true">I</span>
+            <h2 id="ch-i-h" className="inter__h">The land today</h2>
+          </header>
+          <div className="spread-row spread-row--text-first">
+            <div className="prose">
+              <p className="prose__lead">
+                The Foundation&apos;s land is <span className="num fig" data-sc-count="0 1,280">1,280</span> acres of rolling hills, about two
+                square miles, on the southeastern edge of Hoima between Kibati and Kinubi.
+              </p>
+              <p>
+                It is already working. The Kikwite dairy farm runs here today, with a herd of about{" "}
+                <span className="num fig" data-sc-count="0 126">126</span> Friesian cross cows, and it sells milk.
+              </p>
+              <p>
+                To the south, <span className="num fig" data-sc-count="0 300">300</span> acres of forest will stay forest, kept as a game reserve
+                and conservation area. The valley wetland stays as it is, for water, papyrus and birds.
+              </p>
+              <p className="prose__aside">Everything in the chapters that follow starts from what is here today.</p>
+            </div>
+            <figure className="spread spread--md spread--land">
+              <div className="spread__frame" data-sc-act="flow">
+                <div className="spread__par" data-sc-parallax="-0.8">
+                  <Image src={SCENES.land.src} alt={SCENES.land.alt} fill sizes="(min-width: 1100px) 640px, 100vw" className="object-cover" />
+                </div>
+                <span className="aimp">Artist&apos;s impression</span>
+              </div>
+              <figcaption className="spread__cap">
+                <span className="spread__text">
+                  The feel of the land: pasture, the forest valley and the dairy. Made with AI image tools, not a photograph of the site.
+                  Photographs and a drone survey of the land come next.
+                </span>
+              </figcaption>
+            </figure>
+          </div>
         </div>
       </section>
 
-      {/* Legacy */}
-      <section className="wrap grid items-center gap-10 py-16 md:grid-cols-[minmax(0,320px)_1fr]" aria-labelledby="legacy-h">
-        <div className="relative mx-auto aspect-[4/5] w-full max-w-[320px] overflow-hidden rounded-xl border border-line bg-paper-2">
-          <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi, founder of the Foundation" fill sizes="320px" className="object-cover" />
-        </div>
-        <div className="grid gap-4">
-          <p className="eyebrow">A family legacy</p>
-          <h2 id="legacy-h" className="text-[clamp(1.6rem,3vw,2.2rem)] font-bold">Founded by Mr Yesero Mugenyi, carried on by his descendants</h2>
-          <div className="prose-ymf text-muted">
-            <p>
-              The Foundation was founded by Mr Yesero Mugenyi, who worked hard to acquire this land for the sake of his children and grandchildren.
-              Together the family has committed to build a self-sufficient satellite town on it.
-            </p>
-            <p>
-              The work is led by his youngest daughter, Ms Ada Mugenyi, alongside her siblings, her children, and her nieces and nephews,
-              all working hand in hand.
-            </p>
+      {/* II. A grandfather's promise */}
+      <section id="ch-ii" className="ch ch--navy" data-chapter="ii" data-num="II" data-title="A grandfather's promise" aria-labelledby="ch-ii-h">
+        <div className="hwrap">
+          <header className="inter inter--on-dark">
+            <span className="inter__num" aria-hidden="true">II</span>
+            <h2 id="ch-ii-h" className="inter__h">A grandfather&apos;s promise</h2>
+          </header>
+          <div className="spread-row spread-row--portrait" data-sc-act="flow">
+            <figure className="portrait">
+              <div className="portrait__frame" data-sc-reveal="iris" data-sc-reveal-at="0.12 0.42">
+                <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill sizes="(min-width: 1100px) 420px, 80vw" className="object-cover" />
+              </div>
+              <figcaption className="portrait__cap">Mr Yesero Mugenyi, founder. A Mubiito, prince of the royal clan of Bunyoro-Kitara.</figcaption>
+            </figure>
+            <div className="prose prose--on-dark">
+              <blockquote className="pull">
+                <p>
+                  The Yesero Mugenyi Foundation was founded by Mr Yesero Mugenyi and shall be carried on by his descendants.
+                </p>
+              </blockquote>
+              <p>
+                He ran his own law firm in Kampala and built a large library, mostly of law books. He was the pillar of his family&apos;s education:
+                five of his six children became lawyers.
+              </p>
+              <p>
+                Together the family has committed to build a self-sufficient town on the two square miles he worked so hard to acquire, for the sake
+                of his children and grandchildren. The work is led by his youngest daughter, Ada Mugenyi, with her siblings, her children, and her
+                nieces and nephews.
+              </p>
+              <p>
+                <Link href="/story" className="run-link">Read the family&apos;s story</Link>
+              </p>
+            </div>
           </div>
-          <div><Link href="/story" className="btn">Read our story</Link></div>
         </div>
       </section>
 
-      {/* Partner CTA */}
-      <section className="wrap" aria-labelledby="partner-h">
-        <div className="grid gap-6 rounded-2xl bg-forest p-8 text-forest-ink md:grid-cols-[1fr_auto] md:items-center md:p-12">
-          <div className="grid gap-3">
-            <h2 id="partner-h" className="text-[clamp(1.5rem,2.8vw,2rem)] font-bold">Build it with us</h2>
-            <p className="max-w-[60ch] text-forest-ink/85">
-              The Foundation is looking for partners in healthcare, hospitality, education, agriculture and finance. Tell us how you would like to be
-              involved, and we will share the detailed plans.
+      {/* III. The land becomes the town: the one scrub on the page */}
+      <section id="ch-iii" className="ch ch--deep ch--intertitle" data-chapter="iii" data-num="III" data-title="The land becomes the town" aria-labelledby="ch-iii-h">
+        <div className="hwrap">
+          <header className="inter inter--on-dark inter--solo">
+            <span className="inter__num" aria-hidden="true">III</span>
+            <h2 id="ch-iii-h" className="inter__h">The land becomes the town</h2>
+            <p className="inter__lead">
+              This is the family&apos;s 3D concept model, set on the real hills of the land. It starts with what is there today, and the town rises
+              phase by phase as you read on.
             </p>
-          </div>
-          <div><Link href="/partner" className="btn btn-primary">Partner with us</Link></div>
+          </header>
         </div>
       </section>
-    </>
+      <section className="ch ch--deep ch--film" data-sc-act="scrub" data-sc-span="3.6" data-ledger="film" data-phase="0" aria-label="The town rising, phase by phase">
+        <div className="film" data-sc-stage>
+          <div className="hwrap film__grid">
+            <div className="film__legend">
+              <ol className="film__phases">
+                {FILM_PHASES.map((ph, i) => (
+                  <li key={ph.name} data-ph={i}>
+                    <span className="film__ph-name">{ph.name}</span>
+                    <span className="film__ph-ac num">{PHASE_ACRES[i]} acres</span>
+                    <span className="film__ph-note">{ph.note}</span>
+                  </li>
+                ))}
+              </ol>
+              <p className="film__note">
+                Draft layout on real terrain, not an approved design or a surveyed boundary.{" "}
+                <Link href="/explore" className="run-link">Explore the model yourself</Link>
+              </p>
+            </div>
+            <figure className="film__frame">
+              <picture>
+                <source media="(max-width: 860px)" srcSet="/film/m/00.webp" />
+                <img className="film__poster" src="/film/d/00.webp" alt="The land today in the concept model: forest, wetland and the dairy on green hills" />
+              </picture>
+              <canvas
+                data-seq-desktop="/film/d/{ii}.webp:72:0"
+                data-seq-mobile="/film/m/{ii}.webp:72:0"
+                aria-hidden="true"
+              />
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      {/* IV. What will stand here */}
+      <section id="ch-iv" className="ch ch--paper" data-chapter="iv" data-num="IV" data-title="What will stand here" aria-labelledby="ch-iv-h">
+        <div className="hwrap">
+          <header className="inter">
+            <span className="inter__num" aria-hidden="true">IV</span>
+            <h2 id="ch-iv-h" className="inter__h">What will stand here</h2>
+            <p className="inter__lead inter__lead--ink">
+              Sixteen projects in four groups. These pictures are artist&apos;s impressions, made with AI image tools to show how each place could
+              feel. They are not designs, and each project says plainly where it stands.
+            </p>
+          </header>
+
+          <h3 className="group-h">Care and learning</h3>
+          <div className="spreads spreads--a">
+            <Spread scene="hospital" slug="hospital-project" size="lg" />
+            <Spread scene="school" slug="education-project" size="sm" className="spread--drop" />
+          </div>
+          <div className="spreads spreads--b">
+            <Spread scene="library" slug="library-project" size="md" />
+          </div>
+
+          <h3 className="group-h">Land and food</h3>
+          <div className="spreads spreads--a spreads--flip">
+            <Spread scene="agro" slug="agro-industrial-park" size="lg" />
+            <Spread scene="dairy" slug="agri-tourism-project" size="sm" className="spread--drop" />
+          </div>
+
+          <h3 className="group-h">Town life</h3>
+          <div className="spreads spreads--a">
+            <Spread scene="town" slug="shopping-center-project" size="lg" />
+            <Spread scene="homes" slug="housing-project" size="sm" className="spread--drop" />
+          </div>
+
+          <h3 className="group-h">Nature and visitors</h3>
+          <div className="spreads spreads--a spreads--flip">
+            <Spread scene="reserve" slug="animal-conservation-project" size="lg" />
+            <Spread scene="ecolodge" slug="eco-tourism-project" size="sm" className="spread--drop" />
+          </div>
+          <div className="spreads spreads--b">
+            <Spread scene="golf" slug="golf-course-project" size="md" />
+          </div>
+
+          <p className="run-out">
+            The bamboo, hemp research, sports arena and solar network are in the 3D model.{" "}
+            <Link href="/projects" className="run-link">See all sixteen projects and where each one stands</Link>.
+          </p>
+        </div>
+      </section>
+
+      {/* V. Hoima is rising */}
+      <section id="ch-v" className="ch ch--gold" data-chapter="v" data-num="V" data-title="Hoima is rising" aria-labelledby="ch-v-h">
+        <div className="hwrap">
+          <header className="inter inter--on-gold">
+            <span className="inter__num" aria-hidden="true">V</span>
+            <h2 id="ch-v-h" className="inter__h">Hoima is rising</h2>
+            <p className="inter__lead inter__lead--ink">
+              Hoima is the capital of Bunyoro-Kitara. In the next few years it gains an international airport, Uganda&apos;s first oil production and
+              a new national stadium. The land sits on its southeastern edge, near the road to Kampala.
+            </p>
+          </header>
+          <ul className="figs" data-sc-in data-sc-stagger="70">
+            {hoima.map((f) => (
+              <li key={f.label} className="figs__item">
+                <span className="figs__n num">
+                  {countable(f.figure) ? <span data-sc-count={`0 ${f.figure}`}>{f.figure}</span> : f.figure}
+                </span>
+                <span className="figs__l">{f.label}</span>
+                <span className="figs__t">{f.text}</span>
+                <a className="figs__s" href={f.source.url} target="_blank" rel="noopener noreferrer">
+                  {f.source.title.split(",")[0]}, {f.source.date}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="run-out run-out--ink">
+            <Link href="/hoima" className="run-link">Why Hoima, with every source</Link>
+          </p>
+        </div>
+      </section>
+
+      {/* Colophon: the close, with the ask as running text and every acre accounted for */}
+      <section id="colophon" className="ch ch--navy ch--colophon" data-chapter="colophon" aria-labelledby="colo-h">
+        <div className="kitara-band" aria-hidden="true" />
+        <div className="hwrap colophon" data-sc-act="flow">
+          <div className="colophon__ask" data-sc-reveal="up" data-sc-reveal-at="0.05 0.32">
+            <p className="eyebrow colophon__eyebrow">Colophon</p>
+            <h2 id="colo-h" className="colophon__h">Build it with us</h2>
+            <p className="colophon__run">
+              The Foundation brings the land, the family&apos;s commitment and the plans. If you work in healthcare, hospitality, education,
+              agriculture or finance and would like to build part of this town, write to Ada Mugenyi, our Managing Director, at{" "}
+              <a href={`mailto:${CONTACT.email}`} className="run-link">{CONTACT.email}</a>, call{" "}
+              <a href={`tel:${CONTACT.phone.replace(/\s/g, "")}`} className="run-link num">{CONTACT.phone}</a>, or{" "}
+              <Link href="/partner" className="run-link">leave a note on the partner page</Link>. Detailed plans are shared directly with
+              serious partners, not published here.
+            </p>
+          </div>
+          <div className="colophon__ledger">
+            <p className="eyebrow colophon__eyebrow">Every acre, accounted for</p>
+            <LedgerPlate />
+            <p className="colophon__small">
+              One square for each of the {LEDGER_TOTAL.toLocaleString()} acres, sized from the draft land budget in the concept model. A first
+              draft for the family to change, not a survey.
+            </p>
+          </div>
+        </div>
+        <div className="hwrap colophon__foot">
+          <div className="colophon__mast">
+            <span className="colophon__seal">
+              <Image src="/logo.png" alt="" fill sizes="56px" className="object-contain" />
+            </span>
+            <p>
+              <strong>Yesero Mugenyi Foundation Ltd</strong>, incorporated in Uganda in 2011. {CONTACT.address}.
+            </p>
+          </div>
+          <nav aria-label="Pages" className="colophon__nav">
+            <Link href="/projects">Projects</Link>
+            <Link href="/explore">Explore in 3D</Link>
+            <Link href="/story">Our story</Link>
+            <Link href="/hoima">Why Hoima</Link>
+            <Link href="/partner">Partner with us</Link>
+          </nav>
+          <p className="colophon__small">
+            Set in Cormorant Garamond and Nunito. Pictures marked as artist&apos;s impressions were made with AI image tools (Google Gemini) in
+            October 2026. The 3D model is built on open terrain and map data, see the{" "}
+            <Link href="/explore#credits">credits</Link>. Plans, layouts and pictures on this site are concepts for discussion, not approved
+            designs, surveyed boundaries or offers of investment. © {new Date().getFullYear()} Yesero Mugenyi Foundation Ltd.
+          </p>
+        </div>
+      </section>
+    </ScrollCraftRoot>
   );
 }

@@ -28,6 +28,11 @@ export interface Explorer {
   onPick(fn: (z: Zone | null) => void): void;
   /** Frame a named view instantly and hide labels, for still renders. */
   shot(view: string): void;
+  /**
+   * Render one frame of the "land becomes the town" film, for offline frame export.
+   * f runs 0 (today) to 3 (all phases built) and may be fractional; a runs 0 to 1 along the camera path.
+   */
+  film(f: number, a: number, zoom?: number): void;
   dispose(): void;
 }
 
@@ -198,26 +203,32 @@ export async function createExplorer(
   layer.width = layer.height = S;
 
   let phase = 3;
+  let phaseF = 3; // fractional phase used by the film; equals phase in normal use
+  let ovl = 1; // strength of the not-yet-built plan overlay
   let selected: Zone | null = null;
+  const liveAmt = (ph: number) => (ph <= 0 ? 1 : Math.max(0, Math.min(1, phaseF - (ph - 1))));
 
   function paint() {
     const L = layer.getContext("2d")!;
     L.clearRect(0, 0, S, S);
     L.lineCap = "round"; L.lineJoin = "round";
     for (const z of zones) {
-      const live = z.phase <= phase;
+      const a = liveAmt(z.phase);
+      const mix = (off: number, on: number) => off * ovl + (on - off * ovl) * a;
       zonePath(L, z);
-      if (z.id === "forest") L.fillStyle = hexA(z.color, live ? 0.32 : 0.16);
+      if (z.id === "forest") L.fillStyle = hexA(z.color, mix(0.16, 0.32));
       else if (z.id === "wetland") L.fillStyle = hexA("#3f8f9a", 0.6);
-      else L.fillStyle = hexA(z.color, live ? 0.62 : 0.2);
+      else L.fillStyle = hexA(z.color, mix(0.2, 0.62));
       L.fill("evenodd");
-      L.strokeStyle = "rgba(255,255,255,0.75)"; L.lineWidth = Math.max(1, 2.5 * K);
-      L.setLineDash(live ? [] : [10 * K, 7 * K]); L.stroke(); L.setLineDash([]);
+      L.strokeStyle = `rgba(255,255,255,${(0.75 * Math.max(a, ovl)).toFixed(3)})`; L.lineWidth = Math.max(1, 2.5 * K);
+      L.setLineDash(a >= 0.999 ? [] : [10 * K, 7 * K]); L.stroke(); L.setLineDash([]);
     }
     const wz = zones.find((z) => z.id === "wetland");
     if (wz) for (const p of wz.polys) stripes(L, p.o, 0.6, 26, "rgba(190, 230, 232, 0.4)", 5);
     for (const f of plan.paint) {
-      if (f.ph > phase) continue;
+      const fa = liveAmt(f.ph);
+      if (fa <= 0) continue;
+      L.globalAlpha = fa;
       if (f.t === "golf") {
         L.strokeStyle = "rgba(150, 200, 96, 0.95)"; L.lineWidth = 34 * K;
         for (const h of f.holes) { line(L, h); L.stroke(); }
@@ -241,14 +252,19 @@ export async function createExplorer(
       } else if (f.t === "boardwalk") {
         L.strokeStyle = "rgba(130, 94, 58, 0.95)"; L.lineWidth = 4 * K; line(L, f.p); L.stroke();
       }
+      L.globalAlpha = 1;
     }
     for (const r of plan.roads) {
       line(L, r.p);
-      if (r.ph <= phase) {
+      const ra = liveAmt(r.ph);
+      if (ra > 0) {
+        L.globalAlpha = ra;
         L.strokeStyle = "rgba(90, 84, 72, 0.9)"; L.lineWidth = 12 * K; L.stroke();
         L.strokeStyle = "rgba(226, 220, 204, 0.98)"; L.lineWidth = 9 * K; L.stroke();
-      } else {
-        L.strokeStyle = "rgba(240, 236, 224, 0.75)"; L.lineWidth = 3 * K; L.setLineDash([8 * K, 8 * K]); L.stroke(); L.setLineDash([]);
+        L.globalAlpha = 1;
+      }
+      if (ra < 1) {
+        L.strokeStyle = `rgba(240, 236, 224, ${(0.75 * ovl * (1 - ra)).toFixed(3)})`; L.lineWidth = 3 * K; L.setLineDash([8 * K, 8 * K]); L.stroke(); L.setLineDash([]);
       }
     }
     if (selected) {
@@ -434,7 +450,7 @@ export async function createExplorer(
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
   resize();
-  let raf = 0, last = performance.now(), alive = true;
+  let raf = 0, last = performance.now(), alive = true, frozen = false;
   const loop = (now: number) => {
     if (!alive) return;
     const dt = now - last; last = now;
@@ -446,7 +462,7 @@ export async function createExplorer(
     controls.target.x = Math.max(-HW, Math.min(HW, controls.target.x));
     controls.target.z = Math.max(-HH, Math.min(HH, controls.target.z));
     controls.update();
-    for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); }
+    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); }
     renderer.render(scene, camera);
     const w = canvas.clientWidth, h = canvas.clientHeight, dist = camera.position.distanceTo(controls.target);
     for (const l of labels) {
@@ -462,7 +478,7 @@ export async function createExplorer(
   const api: Explorer = {
     zones,
     setPhase(p, animate = true) {
-      phase = p;
+      phase = p; phaseF = p; ovl = 1; frozen = false;
       groups.forEach((g, k) => {
         const show = k <= p;
         if (show && !g.visible) { g.visible = true; g.userData.t = animate && !opts.reduceMotion ? 0 : 1; applyRise(g); }
@@ -497,6 +513,24 @@ export async function createExplorer(
           : t.clone().add(new THREE.Vector3(-0.42 * d, 0.6 * d, -0.68 * d));
       }
       flight = null; controls.target.copy(t); camera.position.copy(p); controls.update();
+    },
+    film(f, a, zoom = 1) {
+      frozen = true; labelsOn = false; selected = null; flight = null;
+      phaseF = Math.max(0, Math.min(3, f)); phase = Math.floor(phaseF + 1e-6); ovl = 0.28;
+      paint();
+      groups.forEach((g, k) => {
+        const amt = k === 0 ? 1 : Math.max(0, Math.min(1, phaseF - (k - 1)));
+        g.visible = amt > 0;
+        g.userData.t = amt; applyRise(g);
+      });
+      const mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
+      const t = new THREE.Vector3(mx, hAt(mx, my), -my);
+      const e = a * a * (3 - 2 * a);
+      const yaw = Math.atan2(0.78, 0.5) + 0.36 - 0.46 * e;
+      const d = (3150 - 800 * e) * zoom, up = 0.54 - 0.12 * e;
+      const p = t.clone().add(new THREE.Vector3(Math.cos(yaw) * d, up * d, Math.sin(yaw) * d));
+      controls.target.copy(t); camera.position.copy(p); controls.update();
+      renderer.render(scene, camera);
     },
     dispose() {
       alive = false; cancelAnimationFrame(raf); ro.disconnect();

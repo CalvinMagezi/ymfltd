@@ -8,19 +8,23 @@ import { NAV } from "@/lib/content/nav";
 
 export default function Header() {
   const path = usePathname();
+  const home = path === "/";
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
-      <div className="wrap flex h-16 items-center justify-between gap-4">
+    <header
+      className={`${home ? "relative" : "sticky top-0"} z-40 bg-navy text-navy-ink`}
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+    >
+      <div className="wrap flex h-[68px] items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-3 no-underline" aria-label="Yesero Mugenyi Foundation, home">
-          <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-line">
-            <Image src="/logo.png" alt="" fill sizes="40px" className="object-contain" priority />
+          <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-[#f5efe1] ring-1 ring-gold-strong/60">
+            <Image src="/logo.png" alt="" fill sizes="44px" className="object-contain p-[2px]" priority />
           </span>
           <span className="leading-tight">
-            <span className="block font-display text-[15px] font-semibold">Yesero Mugenyi Foundation</span>
-            <span className="block font-mono text-[11px] tracking-wide text-muted">New Kikwite Town · Hoima</span>
+            <span className="block font-display text-[19px] font-semibold tracking-[0.01em]">Yesero Mugenyi Foundation</span>
+            <span className="block text-[10.5px] font-extrabold uppercase tracking-[0.18em] text-gold-strong">New Kikwite Town · Hoima</span>
           </span>
         </Link>
 
@@ -28,14 +32,19 @@ export default function Header() {
           <ul className="flex items-center gap-1">
             {NAV.map((n) => {
               const active = path === n.href || (n.href !== "/" && path.startsWith(n.href));
+              const cta = n.href === "/partner";
               return (
                 <li key={n.href}>
                   <Link
                     href={n.href}
                     aria-current={active ? "page" : undefined}
-                    className={`rounded-lg px-3 py-2 text-[15px] font-semibold no-underline transition-colors hover:bg-paper-2 ${
-                      n.href === "/partner" ? "text-gold" : ""
-                    } ${active ? "bg-paper-2" : ""}`}
+                    className={
+                      cta
+                        ? "ml-2 inline-flex rounded-full bg-gold-strong px-4 py-2 text-[14.5px] font-extrabold text-gold-ink no-underline transition-colors hover:bg-gold-soft"
+                        : `relative px-3 py-2 text-[15px] font-bold no-underline opacity-90 transition-opacity hover:opacity-100 after:absolute after:inset-x-3 after:-bottom-[2px] after:h-[2px] after:bg-gold-strong after:transition-transform ${
+                            active ? "opacity-100 after:scale-x-100" : "after:scale-x-0 hover:after:scale-x-100"
+                          }`
+                    }
                   >
                     {n.label}
                   </Link>
@@ -47,7 +56,7 @@ export default function Header() {
 
         <button
           type="button"
-          className="btn lg:hidden"
+          className="btn btn-on-dark !px-4 !py-2.5 lg:hidden"
           aria-expanded={open}
           aria-controls="mobile-nav"
           onClick={() => setOpen((o) => !o)}
@@ -55,11 +64,12 @@ export default function Header() {
           {open ? "Close" : "Menu"}
         </button>
       </div>
-      <nav id="mobile-nav" aria-label="Main" hidden={!open} className="border-t border-line lg:hidden">
+      <div className="kitara-band" aria-hidden="true" />
+      <nav id="mobile-nav" aria-label="Main" hidden={!open} className="border-t border-white/10 lg:hidden">
         <ul className="wrap grid gap-1 py-3">
           {NAV.map((n) => (
             <li key={n.href}>
-              <Link href={n.href} className="block rounded-lg px-3 py-3 text-[17px] font-semibold no-underline hover:bg-paper-2">
+              <Link href={n.href} className="block rounded-lg px-3 py-3 text-[17px] font-bold no-underline hover:bg-white/5">
                 {n.label}
               </Link>
             </li>
