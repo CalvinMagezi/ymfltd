@@ -1,15 +1,10 @@
-import { createClient } from '@sanity/client'
-import imageUrlBuilder from '@sanity/image-url'
+import { createClient } from "@sanity/client";
 
-export const config = {
-  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || 'production',
-  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || 'rxmg1hap',
-  apiVersion: '2023-05-03',
-  useCdn: process.env.NODE_ENV === 'production',
+/** Used only to store enquiries from the partner form. Website content lives in lib/content. */
+export const sanityClient = createClient({
+  dataset: process.env.NEXT_PUBLIC_SANITY_DATASET || "production",
+  projectId: process.env.NEXT_PUBLIC_SANITY_PROJECT_ID || "rxmg1hap",
+  apiVersion: "2023-05-03",
+  useCdn: false,
   token: process.env.SANITY_API_TOKEN,
-}
-
-export const sanityClient = createClient(config)
-
-const builder = imageUrlBuilder(sanityClient)
-export const urlFor = (source: any) => builder.image(source)
+});

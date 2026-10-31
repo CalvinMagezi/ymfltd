@@ -1,26 +1,145 @@
 @import "tailwindcss";
 
+/*
+ * Layout: a planner's register for a town not yet built. Wide concept renders,
+ * thin rules, and mono labels for the things that can be checked (acres, dates, status).
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #f4f5ef;
+  --paper-2: #e8ebe2;
+  --card: #fbfcf8;
+  --ink: #17221b;
+  --muted: #56635a;
+  --line: #d4dacf;
+  --forest: #1d4732;
+  --forest-ink: #eef3ec;
+  --gold: #9a6816;
+  --gold-strong: #b5801f;
+  --gold-ink: #ffffff;
+  --sky: #d7e3e6;
+  --ok: #2f7a4a;
+  --warn: #9a6816;
+  --info: #3c6f8f;
+  --font-display: "Epilogue Variable", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Source Sans 3 Variable", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #0f1612;
+    --paper-2: #151f19;
+    --card: #18231d;
+    --ink: #e6ede7;
+    --muted: #a0b2a6;
+    --line: #2a3a31;
+    --forest: #10301f;
+    --forest-ink: #e6ede7;
+    --gold: #e3b24f;
+    --gold-strong: #e3b24f;
+    --gold-ink: #1b1406;
+    --sky: #18242b;
+    --ok: #6cc08a;
+    --warn: #e3b24f;
+    --info: #7fb4d6;
+    color-scheme: dark;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-forest: var(--forest);
+  --color-forest-ink: var(--forest-ink);
+  --color-gold: var(--gold);
+  --color-gold-strong: var(--gold-strong);
+  --color-gold-ink: var(--gold-ink);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+html { scroll-behavior: smooth; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; letter-spacing: -0.012em; }
+p { text-wrap: pretty; }
+a { color: inherit; }
+::selection { background: color-mix(in srgb, var(--gold) 30%, transparent); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+
+@layer components {
+.wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rule { border-top: 1px solid var(--line); }
+.prose-ymf p + p { margin-top: 1em; }
+.prose-ymf p { max-width: 66ch; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 18px; border-radius: 10px;
+  font-weight: 600; font-size: 16px; line-height: 1; text-decoration: none;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  transition: background-color .15s, border-color .15s, transform .15s;
+}
+.btn:hover { border-color: var(--muted); }
+.btn-primary { background: var(--gold-strong); border-color: transparent; color: var(--gold-ink); }
+.btn-primary:hover { background: var(--gold); border-color: transparent; }
+.btn-on-dark { background: transparent; color: var(--forest-ink); border-color: color-mix(in srgb, var(--forest-ink) 35%, transparent); }
+.btn-on-dark:hover { border-color: var(--forest-ink); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .02em;
+  padding: 4px 8px; border-radius: 99px; border: 1px solid var(--line);
+  color: var(--muted); background: var(--paper); white-space: nowrap;
+}
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--dot, var(--muted)); }
+
+.num { font-variant-numeric: tabular-nums; }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; animation: none !important; }
+}
+
+/* 3D explorer labels (created by the engine) */
+.xlbl {
+  position: absolute; left: 0; top: 0; transform: translate(-50%, -100%);
+  white-space: nowrap; font: 600 12.5px/1.2 var(--font-body);
+  color: #fff; letter-spacing: .01em; padding: 0 0 12px; background: none; border: 0;
+  text-shadow: 0 1px 2px rgba(0,0,0,.85), 0 0 6px rgba(0,0,0,.55);
+}
+.xlbl.zone { pointer-events: auto; cursor: pointer; }
+.xlbl.zone::after {
+  content: ""; position: absolute; left: 50%; bottom: 0; width: 7px; height: 7px; margin-left: -3.5px;
+  border-radius: 50%; background: var(--dot, #fff); box-shadow: 0 0 0 1.5px rgba(0,0,0,.6);
+}
+.xlbl.mark { font-weight: 500; font-size: 11.5px; color: #f4f1e6; padding-bottom: 4px; }
+.xlbl.mark::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px;
+  border: 1.5px solid #f4f1e6; transform: rotate(45deg) translateY(-1px);
 }

@@ -1,154 +1,71 @@
-'use client'
+"use client";
 
-import React, { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { ColorModeSwitcher } from './utils/ColorModeSwitcher'
-import {
-  Box,
-  Flex,
-  HStack,
-  VStack,
-  IconButton,
-  useDisclosure,
-  useColorModeValue,
-  Collapse,
-  Text,
-  Button
-} from '@chakra-ui/react'
-import { HamburgerIcon, CloseIcon } from '@chakra-ui/icons'
-import Image from 'next/image'
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { NAV } from "@/lib/content/nav";
 
-const NavLink = ({ href, children, onClick }: { href: string; children: React.ReactNode; onClick?: () => void }) => {
-  const linkColor = useColorModeValue('gray.700', 'gray.200')
-  const hoverColor = useColorModeValue('blue.600', 'blue.300')
-  
-  return (
-    <Button
-      as={Link}
-      href={href}
-      variant="ghost"
-      fontSize="md"
-      fontWeight="semibold"
-      color={linkColor}
-      _hover={{
-        color: hoverColor,
-        transform: 'translateY(-1px)',
-        textDecoration: 'none'
-      }}
-      transition="all 0.2s"
-      onClick={onClick}
-    >
-      {children}
-    </Button>
-  )
-}
-
-function Header() {
-  const [isScrolled, setIsScrolled] = useState(false)
-  const { isOpen, onToggle, onClose } = useDisclosure()
-  
-  const bgColor = useColorModeValue('white', 'gray.900')
-  const scrolledBgColor = useColorModeValue('rgba(255,255,255,0.95)', 'rgba(26,32,44,0.95)')
-  const borderColor = useColorModeValue('gray.200', 'gray.700')
-  const logoFilter = useColorModeValue('none', 'brightness(1.1)')
-
-  useEffect(() => {
-    const scrollHandler = () => {
-      setIsScrolled(window.pageYOffset > 10)
-    }
-    window.addEventListener('scroll', scrollHandler)
-    return () => window.removeEventListener('scroll', scrollHandler)
-  }, [])
+export default function Header() {
+  const path = usePathname();
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [path]);
 
   return (
-    <Box
-      position="sticky"
-      top={0}
-      zIndex={1000}
-      bg={bgColor}
-      borderBottom={isScrolled ? '1px solid' : 'none'}
-      borderColor={borderColor}
-      boxShadow={isScrolled ? 'md' : 'none'}
-      transition="all 0.3s"
-      backdropFilter="blur(10px)"
-      backgroundColor={isScrolled ? scrolledBgColor : bgColor}
-    >
-      <Box maxW="7xl" mx="auto" px={{ base: 4, md: 8 }}>
-        <Flex h={16} alignItems="center" justifyContent="space-between">
-          {/* Logo */}
-          <Link href="/">
-            <Flex alignItems="center" cursor="pointer">
-              <Image
-                src="/logo.png"
-                width={60}
-                height={48}
-                alt="YMF Limited"
-                style={{ filter: logoFilter }}
-              />
-              <Text
-                ml={3}
-                fontSize={{ base: 'md', md: 'lg' }}
-                fontWeight="bold"
-                color={useColorModeValue('gray.800', 'white')}
-                display={{ base: 'none', sm: 'block' }}
-              >
-                YMF Limited
-              </Text>
-            </Flex>
-          </Link>
+    <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <div className="wrap flex h-16 items-center justify-between gap-4">
+        <Link href="/" className="flex items-center gap-3 no-underline" aria-label="Yesero Mugenyi Foundation, home">
+          <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-line">
+            <Image src="/logo.png" alt="" fill sizes="40px" className="object-contain" priority />
+          </span>
+          <span className="leading-tight">
+            <span className="block font-display text-[15px] font-semibold">Yesero Mugenyi Foundation</span>
+            <span className="block font-mono text-[11px] tracking-wide text-muted">New Kikwite Town · Hoima</span>
+          </span>
+        </Link>
 
-          {/* Desktop Navigation */}
-          <HStack spacing={8} alignItems="center" display={{ base: 'none', lg: 'flex' }}>
-            <HStack spacing={6}>
-              <NavLink href="/">Home</NavLink>
-              <NavLink href="/#investment">Investment</NavLink>
-              <NavLink href="/#partnerships">Partnerships</NavLink>
-              <NavLink href="/#projects">Projects</NavLink>
-              <NavLink href="/#members">Team</NavLink>
-              <NavLink href="/#contact">Contact</NavLink>
-            </HStack>
-            <ColorModeSwitcher />
-          </HStack>
+        <nav aria-label="Main" className="hidden lg:block">
+          <ul className="flex items-center gap-1">
+            {NAV.map((n) => {
+              const active = path === n.href || (n.href !== "/" && path.startsWith(n.href));
+              return (
+                <li key={n.href}>
+                  <Link
+                    href={n.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`rounded-lg px-3 py-2 text-[15px] font-semibold no-underline transition-colors hover:bg-paper-2 ${
+                      n.href === "/partner" ? "text-gold" : ""
+                    } ${active ? "bg-paper-2" : ""}`}
+                  >
+                    {n.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
 
-          {/* Mobile menu button */}
-          <Flex alignItems="center" display={{ base: 'flex', lg: 'none' }}>
-            <ColorModeSwitcher mr={2} />
-            <IconButton
-              size="md"
-              icon={isOpen ? <CloseIcon /> : <HamburgerIcon />}
-              aria-label="Toggle navigation"
-              onClick={onToggle}
-              variant="ghost"
-              color={useColorModeValue('gray.700', 'gray.200')}
-              _hover={{
-                bg: useColorModeValue('gray.100', 'gray.700')
-              }}
-            />
-          </Flex>
-        </Flex>
-
-        {/* Mobile Navigation */}
-        <Collapse in={isOpen} animateOpacity>
-          <Box
-            pb={4}
-            display={{ lg: 'none' }}
-            bg={bgColor}
-            borderRadius="md"
-            mt={2}
-          >
-            <VStack spacing={2} alignItems="stretch">
-              <NavLink href="/" onClick={onClose}>Home</NavLink>
-              <NavLink href="/#investment" onClick={onClose}>Investment</NavLink>
-              <NavLink href="/#partnerships" onClick={onClose}>Partnerships</NavLink>
-              <NavLink href="/#projects" onClick={onClose}>Projects</NavLink>
-              <NavLink href="/#members" onClick={onClose}>Team</NavLink>
-              <NavLink href="/#contact" onClick={onClose}>Contact</NavLink>
-            </VStack>
-          </Box>
-        </Collapse>
-      </Box>
-    </Box>
-  )
+        <button
+          type="button"
+          className="btn lg:hidden"
+          aria-expanded={open}
+          aria-controls="mobile-nav"
+          onClick={() => setOpen((o) => !o)}
+        >
+          {open ? "Close" : "Menu"}
+        </button>
+      </div>
+      <nav id="mobile-nav" aria-label="Main" hidden={!open} className="border-t border-line lg:hidden">
+        <ul className="wrap grid gap-1 py-3">
+          {NAV.map((n) => (
+            <li key={n.href}>
+              <Link href={n.href} className="block rounded-lg px-3 py-3 text-[17px] font-semibold no-underline hover:bg-paper-2">
+                {n.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </header>
+  );
 }
-
-export default Header

@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Yesero Mugenyi Foundation website
 
-## Getting Started
+The public site for New Kikwite Town, the Foundation's planned satellite town on 1,280 acres southeast of Hoima, Uganda.
 
-First, run the development server:
+Next.js 16 (App Router), React 19, Tailwind CSS 4, three.js. Bun is the package manager.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install
+bun run dev        # http://localhost:3000
+bun run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Pages
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Route | What it is |
+| --- | --- |
+| `/` | Home: the vision, what exists today, the four project themes, phases, the family, partner call |
+| `/explore` | Interactive 3D concept model of the town (public version) |
+| `/projects`, `/projects/[slug]` | The 16 projects, each with an honest status |
+| `/story` | The founder, the family, documented milestones, how we work |
+| `/hoima` | Sourced facts about Hoima, each linked to its source |
+| `/partner` | Who we want to hear from, how it works, enquiry form |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Content rules
 
-## Learn More
+All copy lives in `lib/content/`. Before adding or changing a factual claim, read `docs/FACTS.md`:
+every claim must trace to a family document or a cited public source, and plans are described as plans.
+No investment figures (raise size, IRR, MOIC) on the public site; those go in the investor pack.
 
-To learn more about Next.js, take a look at the following resources:
+## The 3D model
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`tools/concept-model/` holds the Python pipeline that builds the model from open data
+(OpenStreetMap, SRTM terrain, Sentinel-2 cloudless imagery) and writes `public/explore/`.
+The public export has no satellite photo, no site boundary line and no neighbouring buildings.
+The family's detailed version, with imagery and the traced outline, is kept private.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`tools/concept-model/renders.py` regenerates the still images in `public/images/concept/` from a running build.
 
-## Deploy on Vercel
+## Enquiries
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The partner form stores enquiries in the Foundation's Sanity dataset. It needs `SANITY_API_TOKEN`
+in the Vercel environment; without it the form tells visitors to email instead.
+The old Sanity Studio config is kept in `sanity-studio/` for reference.
