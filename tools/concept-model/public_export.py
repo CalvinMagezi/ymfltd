@@ -37,6 +37,12 @@ for z in plan["zones"]:
 plan.pop("existing_inside", None)
 plan.pop("boundary", None)
 json.dump(plan, open(f"{OUT}/plan.json", "w"), separators=(",", ":"))
+# The home page ledger needs only these four fields per zone; keeping them apart keeps the
+# 180 KB plan out of the home page's JavaScript.
+ROOT = os.path.join(OUT, "..", "..")
+with open(os.path.join(ROOT, "lib", "content", "ledger-zones.json"), "w") as fh:
+    json.dump([{k: z[k] for k in ("id", "acres", "phase", "color")} for z in plan["zones"]], fh, separators=(",", ":"))
+    fh.write("\n")
 
 # ---------- context: roads + public landmarks only ----------
 roads = [r for r in ctx["roads"] if r["c"] >= 1]
@@ -85,7 +91,7 @@ col = col * (1 - forest[..., None]) + C_FOREST * forest[..., None]
 col = col * (1 - 0.85 * dens[..., None]) + C_TOWN * (0.85 * dens[..., None])
 lit = 0.62 + 0.5 * shade[..., None]
 img = np.clip(col * lit, 0, 1)
-Image.fromarray((img * 255).astype(np.uint8)).save(f"{OUT}/ground.jpg", quality=86)
+Image.fromarray((img * 255).astype(np.uint8)).save(f"{OUT}/ground.webp", quality=82, method=6)
 
 for f in os.listdir(OUT):
     print(f, round(os.path.getsize(os.path.join(OUT, f)) / 1024), "KB")

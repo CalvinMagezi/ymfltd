@@ -5,21 +5,14 @@ import { useEffect, useRef, type ReactNode } from "react";
 type SCApi = { destroy: () => void; layout: () => void };
 type SCGlobal = { mount: (root: Element, opts?: object) => SCApi };
 
-const SRC = "/vendor/scrollcraft/scrollcraft.js";
-
 function loadEngine(): Promise<SCGlobal> {
-  const w = window as unknown as { ScrollCraft?: SCGlobal; __scLoading?: Promise<SCGlobal> };
+  const w = window as unknown as { ScrollCraft?: SCGlobal };
   if (w.ScrollCraft) return Promise.resolve(w.ScrollCraft);
-  if (w.__scLoading) return w.__scLoading;
-  w.__scLoading = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = SRC;
-    s.async = true;
-    s.onload = () => (w.ScrollCraft ? resolve(w.ScrollCraft) : reject(new Error("engine missing")));
-    s.onerror = () => reject(new Error("engine failed to load"));
-    document.head.appendChild(s);
+  // The vendored file is imported as-is; the bundler only minifies it. It defines window.ScrollCraft.
+  return import("@/public/vendor/scrollcraft/scrollcraft.js").then(() => {
+    if (!w.ScrollCraft) throw new Error("engine missing");
+    return w.ScrollCraft;
   });
-  return w.__scLoading;
 }
 
 /**

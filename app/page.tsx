@@ -37,7 +37,7 @@ function Spread({ scene, slug, size = "lg", className = "" }: { scene: SceneKey;
     <figure className={`spread spread--${size} ${className}`} data-sc-in>
       <div className="spread__frame" data-sc-act="flow">
         <div className="spread__par" data-sc-parallax="-0.7">
-          <Image src={s.src} alt={s.alt} fill sizes={sizes} className="object-cover" />
+          <Image src={s.src} alt={s.alt} fill quality={60} sizes={sizes} className="object-cover" />
         </div>
         <span className="aimp">Artist&apos;s impression</span>
       </div>
@@ -68,7 +68,7 @@ export default function Home() {
       {/* Title page: type on its own ground, the seal, no pictures above the fold */}
       <section className="ch ch--title" data-chapter="title" aria-labelledby="title-h">
         <div className="title__sky" aria-hidden="true">
-          <Image src="/images/hill-sky.jpg" alt="" fill priority sizes="100vw" quality={50} className="object-cover object-[62%_38%]" />
+          <Image src="/images/hill-sky.jpg" alt="" fill loading="eager" fetchPriority="high" sizes="100vw" quality={50} className="object-cover object-[62%_38%]" />
         </div>
         <div className="hwrap title">
           <div className="title__text">
@@ -81,7 +81,7 @@ export default function Home() {
           </div>
           <div className="title__seal" aria-hidden="true">
             <span className="title__disc">
-              <Image src="/logo.png" alt="" fill sizes="(min-width: 1100px) 340px, 200px" className="object-contain" priority />
+              <Image src="/logo.png" alt="" fill sizes="(min-width: 1100px) 340px, 200px" className="object-contain" loading="eager" />
             </span>
           </div>
         </div>
@@ -126,7 +126,7 @@ export default function Home() {
             <figure className="spread spread--md spread--land">
               <div className="spread__frame" data-sc-act="flow">
                 <div className="spread__par" data-sc-parallax="-0.8">
-                  <Image src={SCENES.land.src} alt={SCENES.land.alt} fill sizes="(min-width: 1100px) 640px, 100vw" className="object-cover" />
+                  <Image src={SCENES.land.src} alt={SCENES.land.alt} fill quality={60} sizes="(min-width: 1100px) 640px, 100vw" className="object-cover" />
                 </div>
                 <span className="aimp">Artist&apos;s impression</span>
               </div>
@@ -151,7 +151,7 @@ export default function Home() {
           <div className="spread-row spread-row--portrait" data-sc-act="flow">
             <figure className="portrait">
               <div className="portrait__frame" data-sc-reveal="iris" data-sc-reveal-at="0.12 0.42">
-                <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill sizes="(min-width: 1100px) 420px, 80vw" className="object-cover object-[50%_18%]" />
+                <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill quality={60} sizes="(min-width: 1100px) 420px, 80vw" className="object-cover object-[50%_18%]" />
               </div>
               <figcaption className="portrait__cap">Mr Yesero Mugenyi, founder. A Mubiito, prince of the royal clan of Bunyoro-Kitara.</figcaption>
             </figure>
@@ -212,7 +212,7 @@ export default function Home() {
             <figure className="film__frame">
               <picture>
                 <source media="(max-width: 860px)" srcSet="/film/m/00.webp" />
-                <img className="film__poster" src="/film/d/00.webp" alt="The land today in the concept model: forest, wetland and the dairy on green hills" />
+                <img className="film__poster" src="/film/d/00.webp" alt="The land today in the concept model: forest, wetland and the dairy on green hills" loading="lazy" decoding="async" width={1440} height={810} />
               </picture>
               <FilmPlayer desktop="/film/d/{ii}.webp" mobile="/film/m/{ii}.webp" count={72} />
             </figure>
@@ -235,7 +235,7 @@ export default function Home() {
           <figure className="pano" data-sc-in>
             <div className="pano__frame" data-sc-act="flow">
               <div className="spread__par" data-sc-parallax="-0.9">
-                <Image src={SCENES.aerial.src} alt={SCENES.aerial.alt} fill sizes="(min-width: 1100px) 1170px, 100vw" className="object-cover" />
+                <Image src={SCENES.aerial.src} alt={SCENES.aerial.alt} fill quality={60} sizes="(min-width: 1100px) 1170px, 100vw" className="object-cover" />
               </div>
               <span className="aimp">Artist&apos;s impression</span>
             </div>

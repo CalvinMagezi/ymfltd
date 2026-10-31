@@ -1,7 +1,4 @@
 @import "tailwindcss";
-/* scroll-craft engine stylesheet, vendored unmodified (see public/vendor/scrollcraft/SOURCE.txt).
-   Loaded into the base layer so Tailwind utilities and the site's own rules win over its resets. */
-@import "../public/vendor/scrollcraft/scrollcraft.css" layer(base);
 
 /*
  * Kitara: royal navy, cream paper and burnished gold, taken from the
@@ -30,7 +27,7 @@
   --navy-3: #0c1730;
   --navy-ink: #f5efe1;
   --royal: #2346a8;
-  --gold: #8a6420;
+  --gold: #7d5814;
   --gold-strong: #d3a74a;
   --gold-soft: #e9cf8f;
   --gold-ink: #14223f;
@@ -38,9 +35,9 @@
   --ok: #2f7a4a;
   --warn: #9a6816;
   --info: #2d5aa8;
-  --font-display: "Cormorant Garamond Variable", "Cormorant Garamond", Garamond, "Times New Roman", serif;
-  --font-body: "Nunito Variable", "Nunito", "Segoe UI", Roboto, Arial, sans-serif;
-  --font-mono: "Nunito Variable", "Nunito", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: var(--font-cormorant), Garamond, "Times New Roman", serif;
+  --font-body: var(--font-nunito), "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: var(--font-nunito), "Segoe UI", Roboto, Arial, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root {

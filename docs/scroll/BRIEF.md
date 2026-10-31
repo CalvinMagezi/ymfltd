@@ -80,7 +80,7 @@ grammar differs (chaptered editorial), nav differs (margin folio, no fixed bar),
 ## Build notes (31 October 2026)
 
 - **Brand.** Royal navy `#14223f` / `#1d2d51`, cream `#f5efe1`, burnished gold `#d3a74a`, from the Kitara Heritage Library deck. Royal blue `#2346a8` for links on cream. Cormorant Garamond for display, Nunito for text. The founder seal stays the mark. The diagonal gold band from the deck sits under the header and over the footer.
-- **Engine.** `public/vendor/scrollcraft/` is scroll-craft 0.3.1, unmodified. `components/home/ScrollCraftRoot.tsx` loads and mounts it on the home page only and calls `destroy()` on navigation. The stylesheet is imported into the CSS base layer so the site's own rules win.
+- **Engine.** `public/vendor/scrollcraft/` is scroll-craft 0.3.1, unmodified. `components/home/ScrollCraftRoot.tsx` imports it as a module (so the bundler minifies it), mounts it on the home page only and calls `destroy()` on navigation. Its stylesheet is imported by `app/home.css`, into the CSS base layer, so inner pages do not carry it and the site's own rules win.
 - **The peak.** 72 frames rendered from the real 3D model (`tools/film/render-frames.cjs`), 1440x810 for desktop and 900x900 for phones, about 5.6 MB and 3.9 MB, loaded once the reader is into chapter I. `components/home/FilmPlayer.tsx` draws them: the playhead eases toward the scroll position (140 ms time constant) and neighbouring frames are cross-faded, so the town rises smoothly instead of stepping. The phase legend and the acre ledger follow the same eased playhead (`filmPhase()` in `components/home/film-timing.ts`). The pin is still scroll-craft's.
 - **Pictures.** Photoreal scenes made in the Gemini app (`public/images/city/`, `lib/content/scenes.ts`) in a modern smart-town style: paved streets, contemporary brick, stone and glass, green roofs and solar. The land-today picture stays rural on purpose. Every one is labelled "Artist's impression" where it appears, and the colophon and model credits say how they were made.
 - **Honesty rules kept.** Counters only on figures the family or a cited source gave (1,280 acres, 126 cows, 300 acres of forest; the Hoima figures with their sources). Land budget acres are labelled as a draft. No investment figures.
@@ -88,3 +88,15 @@ grammar differs (chaptered editorial), nav differs (margin folio, no fixed bar),
 ## Verification
 
 Checked on the production build with headless Chromium at 1440x900 and 390x844, and with reduced motion: title page, every chapter, four points through the film, the colophon, and the inner pages. No console errors. The film legend and ledger were checked against the frame shown at 10%, 35%, 62% and 95% of the pin. Not yet checked on a real phone or in Safari.
+
+## Performance pass (1 November 2026)
+
+Lighthouse 12.8, local production build, simulated mobile unless noted. Before: home 80 performance, 93 accessibility. After: home 76 to 88 across runs (desktop 99), inner pages 88 to 94, explore 62; accessibility, best practices and SEO 100 on every page.
+
+- Fonts are self-hosted with `next/font/local` (`app/fonts/`), preloaded, with size-matched fallbacks so the swap does not shift text.
+- The home ledger reads `lib/content/ledger-zones.json` (four fields per zone) instead of the 180 KB `plan.json`, which had been shipping inside the home page JavaScript. `public_export.py` writes both.
+- Hero and page-head pictures use `fetchPriority="high"`; content photos use quality 60. The explore ground texture is WebP (83 KB, was a 238 KB JPEG).
+- Explore renders its panels and intro card on the server and starts the 3D work once the page is idle. It draws only when something changes (camera, a flight, buildings rising), so a still view uses no CPU or GPU. Labels that would overlap one already placed are hidden, so names stay readable and tappable.
+- `experimental.inlineCss` was tried and left off (it copies the CSS into the RSC payload and scored worse).
+- What remains is mostly React and Next's own runtime on the main thread, and on explore the first WebGL frame (shader compile and texture upload), which is slow and erratic on the software renderer Lighthouse uses. `renderer.compileAsync` was tried and made it worse.
+- PageSpeed Insights on the Vercel preview (mobile / desktop): home 91 / 99, projects 94 / 100, explore 63 mobile before the draw-on-change fix; accessibility, best practices and SEO 100.

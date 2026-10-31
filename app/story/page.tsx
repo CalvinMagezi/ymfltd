@@ -37,7 +37,7 @@ export default function StoryPage() {
         </div>
         <figure className="grid gap-3">
           <div className="relative aspect-[4/5] overflow-hidden rounded-t-[190px] rounded-b-[14px] ring-1 ring-gold-strong/50 bg-navy">
-            <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill priority sizes="380px" className="object-cover object-[50%_18%]" />
+            <Image src="/images/team/grandpapa1.jpeg" alt="Mr Yesero Mugenyi" fill loading="eager" fetchPriority="high" sizes="380px" className="object-cover object-[50%_18%]" />
           </div>
           <figcaption className="text-[14px] text-navy-ink/70">Mr Yesero Mugenyi, founder. A Mubiito, prince of the royal clan of Bunyoro-Kitara.</figcaption>
         </figure>

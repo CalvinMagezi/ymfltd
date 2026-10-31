@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Explorer, Zone } from "@/lib/explore/engine";
 import { PHASES, TOUR, ZONE_INFO, ZONE_PROJECT } from "@/lib/content/zones";
@@ -19,7 +18,6 @@ export default function ExploreClient() {
   const labelsRef = useRef<HTMLDivElement>(null);
   const exRef = useRef<Explorer | null>(null);
   const demoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const params = useSearchParams();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhaseState] = useState(3);
@@ -61,7 +59,8 @@ export default function ExploreClient() {
     const sky = getComputedStyle(document.documentElement).getPropertyValue("--sky").trim() || "#d7e3e6";
     const small = Math.min(window.innerWidth, window.innerHeight) < 700 || (navigator.hardwareConcurrency || 8) <= 4;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    import("@/lib/explore/engine")
+    // Start the 3D work once the page has painted and gone idle, so the panels and intro card show first.
+    const load = () => import("@/lib/explore/engine")
       .then(({ createExplorer }) => createExplorer(canvas, labelsEl, { base: "/explore", sky, small, reduceMotion }))
       .then((ex) => {
         if (disposed) { ex.dispose(); return; }
@@ -75,11 +74,15 @@ export default function ExploreClient() {
           ex.select(z.id, false);
         });
         setReady(true);
+        // Read the query directly rather than with useSearchParams, so the panels and intro card render on the server.
         const zid = new URLSearchParams(window.location.search).get("zone");
         const z = zid ? ex.zones.find((q) => q.id === zid) : null;
         if (z) { setCard({ kind: "zone", zone: z }); ex.select(z.id, true); }
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    const idle = typeof window.requestIdleCallback === "function"
+      ? window.requestIdleCallback(() => void load(), { timeout: 1200 })
+      : window.setTimeout(() => void load(), 60);
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onScheme = () => {
       const c = getComputedStyle(document.documentElement).getPropertyValue("--sky").trim();
@@ -88,19 +91,14 @@ export default function ExploreClient() {
     mq.addEventListener("change", onScheme);
     return () => {
       disposed = true;
+      if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
       mq.removeEventListener("change", onScheme);
       if (demoRef.current) clearTimeout(demoRef.current);
       exRef.current?.dispose();
       exRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    const zid = params.get("zone");
-    const z = zid ? zones.find((q) => q.id === zid) : null;
-    if (z) openZone(z, true);
-  }, [params, ready, zones, openZone]);
 
   useEffect(() => { exRef.current?.showLabels(labels); }, [labels]);
   useEffect(() => { setBudgetOpen(window.matchMedia("(min-width: 1024px)").matches); }, []);

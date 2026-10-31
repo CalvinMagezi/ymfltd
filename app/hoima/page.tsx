@@ -12,7 +12,7 @@ export default function HoimaPage() {
   return (
     <>
       <header className="relative isolate overflow-hidden bg-navy-2 text-navy-ink">
-        <Image src="/images/bg1.jpeg" alt="Hills around Hoima" fill priority sizes="100vw" className="-z-10 object-cover opacity-30 mix-blend-luminosity" />
+        <Image src="/images/bg1.jpeg" alt="Hills around Hoima" fill loading="eager" fetchPriority="high" quality={50} sizes="100vw" className="-z-10 object-cover opacity-30 mix-blend-luminosity" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#14223f] via-[#14223f]/85 to-[#14223f]/40" aria-hidden />
         <div className="wrap grid gap-5 py-20 md:py-28">
           <p className="eyebrow !text-gold-strong">Why Hoima</p>

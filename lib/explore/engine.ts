@@ -67,9 +67,11 @@ export async function createExplorer(
     fetch(`${opts.base}/plan.json`).then((r) => r.json()),
     new Promise<HTMLImageElement>((res, rej) => {
       const im = new Image();
-      im.onload = () => res(im);
+      im.decoding = "async";
+      // Decode off the main thread before the image is drawn, so drawImage does not decode it synchronously.
+      im.onload = () => (im.decode ? im.decode().catch(() => undefined) : Promise.resolve()).then(() => res(im));
       im.onerror = rej;
-      im.src = `${opts.base}/ground.jpg`;
+      im.src = `${opts.base}/ground.webp`;
     }),
   ]);
   const F = ctx.frame, HW: number = F.half_w, HH: number = F.half_h, N: number = ctx.dem.n;
@@ -376,8 +378,12 @@ export async function createExplorer(
   };
 
   // ---------- labels ----------
-  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone };
+  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number };
   const labels: Lbl[] = [];
+  const placed: number[][] = [];
+  // Draw only when something changed (camera, flight, rising buildings, a call to the API), so a still
+  // view costs nothing: cooler phones, longer batteries, and a free main thread.
+  let dirty = true;
   let pickFn: (z: Zone | null) => void = () => {};
   const addLabel = (text: string, x: number, y: number, cls: string, zone?: Zone) => {
     const el = document.createElement(zone ? "button" : "div");
@@ -446,7 +452,10 @@ export async function createExplorer(
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    for (const l of labels) l.w = 0; // measure again: fonts or text size may have changed
+    dirty = true;
   };
+  document.fonts?.ready.then(() => { for (const l of labels) l.w = 0; dirty = true; });
   const ro = new ResizeObserver(resize);
   ro.observe(canvas);
   resize();
@@ -458,18 +467,32 @@ export async function createExplorer(
       const t = Math.min(1, (now - flight.t0) / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       controls.target.lerpVectors(flight.fromT, flight.toT, e); camera.position.lerpVectors(flight.fromP, flight.toP, e);
       if (t >= 1) flight = null;
+      dirty = true;
     }
     controls.target.x = Math.max(-HW, Math.min(HW, controls.target.x));
     controls.target.z = Math.max(-HH, Math.min(HH, controls.target.z));
-    controls.update();
-    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); }
+    if (controls.update()) dirty = true;
+    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); dirty = true; }
+    if (!dirty) { raf = requestAnimationFrame(loop); return; }
+    dirty = false;
     renderer.render(scene, camera);
     const w = canvas.clientWidth, h = canvas.clientHeight, dist = camera.position.distanceTo(controls.target);
+    // Labels are placed in order (zones first) and any that would overlap one already placed is hidden,
+    // so names stay readable and each one is a clear tap target on small screens.
+    placed.length = 0;
     for (const l of labels) {
       tmp.copy(l.v).project(camera);
-      const vis = labelsOn && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05 && !(l.zone && dist > 9000);
+      let vis = labelsOn && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05 && !(l.zone && dist > 9000);
+      const x = ((tmp.x + 1) / 2) * w, y = ((1 - tmp.y) / 2) * h;
+      if (vis) {
+        if (!l.w) { l.el.style.display = ""; l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
+        const bw = l.w || 60, bh = l.h || 24;
+        const box = [x - bw / 2 - 3, y - bh - 3, x + bw / 2 + 3, y + 3];
+        if (placed.some((q) => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) vis = false;
+        else placed.push(box);
+      }
       l.el.style.display = vis ? "" : "none";
-      if (vis) l.el.style.transform = `translate(${(((tmp.x + 1) / 2) * w).toFixed(1)}px, ${(((1 - tmp.y) / 2) * h).toFixed(1)}px) translate(-50%, -100%)`;
+      if (vis) l.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
       if (l.zone) l.el.style.opacity = l.zone.phase <= phase ? "1" : "0.72";
     }
     raf = requestAnimationFrame(loop);
@@ -539,6 +562,10 @@ export async function createExplorer(
     },
   };
   (api as any).setSky = setSky;
+  for (const k of Object.keys(api)) {
+    const f = (api as any)[k];
+    if (typeof f === "function") (api as any)[k] = (...a: unknown[]) => { dirty = true; return f.apply(api, a); };
+  }
   api.setPhase(3, false);
   const [t0, p0] = overviewView();
   flyTo(t0, p0, 0);
