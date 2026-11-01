@@ -66,6 +66,7 @@ These were added in the November 2025 "investor platform" rewrite (commit `64084
 2. **Family titles.** The Story page uses the titles the family listed in 2022. Please confirm each person is happy to be listed and that titles are current, in particular:
    - Ana Mugenyi, "Judge of the High Court". Should a serving judge be named on a company site that invites investors?
    - Ham Mugenyi, "Chairman of the Uganda Development Corporation Board". Still current?
+   - Every member is now listed as a Director, ahead of their other titles (Calvin, 1 Nov 2026).
    - Asa Mugenyi. The 2022 text said "Head of the Tax Tribunal"; public records show he chaired the Tax Appeals Tribunal until 2023, so the site now says "former Chairperson".
 3. **State House letter (13 Nov 2024).** It records that the founder met the President on 5 Oct 2024 and that the Ministry of Health was directed to provide a consultant to assess the hospital's viability. Strong, true and documented, but it is government correspondence. Publish a line about it? Not on the site until the family says yes.
 4. **Library.** Google Maps shows a "Mugenyi Private Library" pin in Kikwite. Is there a building already, or only the book collection? The site currently says books are being collected.
