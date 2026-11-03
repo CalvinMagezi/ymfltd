@@ -8,6 +8,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ZONE_SHORT } from "@/lib/content/zones";
+import type { BuildingMesh, UpgradeManifest } from "./upgrade";
+
+// Kept in step with MIN_RISE in ./upgrade, which is not imported here so its loader stays out of this chunk.
+const MIN_RISE = 0.001;
 
 export interface Zone {
   id: string;
@@ -37,6 +41,11 @@ export interface Explorer {
 }
 
 const EXAG = 1.5;
+// The detailed buildings and baked shadows swap in on the reader's first interaction, or after this
+// long, so their shader compile and ground re-upload never compete with the first view loading.
+const UPGRADE_FALLBACK_MS = 12000;
+const UPGRADE_TRIGGERS = ["pointerdown", "wheel", "keydown", "touchstart"] as const;
+const UPGRADE_RETRY_MS = 1000; // wait out a flight or a film capture before swapping meshes
 const KIND: Record<string, number> = {
   hospital: 0xf4f1ec, library: 0xc98f5a, museum: 0xd8b48a, commercial: 0xe7d7ef, hotel: 0xf3e3bd, villa: 0xf6efe0,
   apartment: 0xf2e8d8, townhouse: 0xe9d3b1, university: 0xdfe4fb, warehouse: 0xcfd2c6, barn: 0xb5532f, processing: 0xe8e2cf,
@@ -210,6 +219,22 @@ export async function createExplorer(
   let selected: Zone | null = null;
   const liveAmt = (ph: number) => (ph <= 0 ? 1 : Math.max(0, Math.min(1, phaseF - (ph - 1))));
 
+  // Baked shadow maps, one per phase, fetched on first use once the upgrade manifest is known.
+  let upgradeMod: typeof import("./upgrade") | null = null;
+  let manifest: UpgradeManifest | null = null;
+  const shadows: (HTMLImageElement | null | undefined)[] = [];
+  const shadowFor = (p: number) => {
+    if (!manifest || !upgradeMod) return null;
+    if (shadows[p] === undefined) {
+      shadows[p] = null;
+      upgradeMod.loadImage(`${opts.base}/upgrade/${manifest.shadows[p]}`).then((im) => {
+        shadows[p] = im;
+        if (alive && p === phase) { paint(); dirty = true; }
+      }, () => undefined);
+    }
+    return shadows[p];
+  };
+
   function paint() {
     const L = layer.getContext("2d")!;
     L.clearRect(0, 0, S, S);
@@ -281,6 +306,13 @@ export async function createExplorer(
     const g = texCanvas.getContext("2d")!;
     g.drawImage(baseCanvas, 0, 0);
     g.drawImage(layer, 0, 0);
+    const shade = shadowFor(phase);
+    if (shade && manifest) {
+      const b = manifest.shadowBounds;
+      g.globalCompositeOperation = "multiply";
+      g.drawImage(shade, cx(b.x0), cy(b.y1), cx(b.x1) - cx(b.x0), cy(b.y0) - cy(b.y1));
+      g.globalCompositeOperation = "source-over";
+    }
     tex.needsUpdate = true;
   }
 
@@ -328,17 +360,18 @@ export async function createExplorer(
     return g;
   }
 
+  const markBoxes = (m: THREE.InstancedMesh) => { m.userData.boxes = true; return m; };
   const groups: THREE.Group[] = [];
   for (let k = 0; k < 4; k++) {
     const grp = new THREE.Group();
     grp.userData.t = 1;
     const bx = plan.boxes.filter((b: any) => b[7] === k);
-    if (bx.length) grp.add(instanced(boxGeo, mat, bx, (b, p, q, s, c) => {
+    if (bx.length) grp.add(markBoxes(instanced(boxGeo, mat, bx, (b, p, q, s, c) => {
       const h0 = hAt(b[0], b[1]);
       const slope = Math.max(Math.abs(hAt(b[0] + b[2] / 2, b[1]) - h0), Math.abs(hAt(b[0], b[1] + b[3] / 2) - h0));
       p.set(b[0], h0 - slope - 0.5, -b[1]); q.setFromAxisAngle(UP, b[5]); s.set(b[2], b[4] + slope + 0.5, b[3]);
       c.setHex(KIND[b[6]] ?? 0xeeeeee);
-    }));
+    })));
     const cy_ = plan.cyl.filter((c: any) => c[5] === k);
     const solids = cy_.filter((c: any) => c[6] === 0 || c[6] === 1);
     if (solids.length) grp.add(instanced(cylGeo, mat, solids, (c, p, q, s, col) => {
@@ -371,9 +404,10 @@ export async function createExplorer(
     const m = new THREE.Matrix4(), s = new THREE.Vector3();
     g.children.forEach((mesh: any) => {
       if (mesh.isInstancedMesh) {
-        mesh.userData.base.forEach((b: any, i: number) => { s.copy(b.s); s.y *= Math.max(0.001, e); m.compose(b.p, b.q, s); mesh.setMatrixAt(i, m); });
+        mesh.userData.base.forEach((b: any, i: number) => { s.copy(b.s); s.y *= Math.max(MIN_RISE, e); m.compose(b.p, b.q, s); mesh.setMatrixAt(i, m); });
         mesh.instanceMatrix.needsUpdate = true;
-      } else if (mesh.userData.arena) mesh.scale.y = Math.max(0.001, e);
+      } else if (mesh.userData.arena) mesh.scale.y = Math.max(MIN_RISE, e);
+      else if (mesh.userData.upgrade) (mesh.userData.upgrade as BuildingMesh).setRise(e);
     });
   };
 
@@ -558,6 +592,8 @@ export async function createExplorer(
     dispose() {
       alive = false; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointerup", onUp);
+      stopUpgrade();
+      for (const m of upgraded) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
       controls.dispose(); renderer.dispose(); labelsEl.innerHTML = "";
     },
   };
@@ -570,5 +606,54 @@ export async function createExplorer(
   const [t0, p0] = overviewView();
   flyTo(t0, p0, 0);
   raf = requestAnimationFrame(loop);
+
+  // Swap the plain boxes for the detailed buildings only after they have loaded; any failure keeps the boxes.
+  const upgraded: THREE.Mesh[] = [];
+  let stopUpgrade = () => {};
+  const upgrade = async () => {
+    const mod = await import("./upgrade");
+    const m = await mod.loadManifest(opts.base);
+    // Fetch the current phase's shadow map with the buildings, so the ground repaints and re-uploads once.
+    const p0 = phase;
+    const [meshes, shade] = await Promise.all([
+      mod.loadBuildings(opts.base, m),
+      mod.loadImage(`${opts.base}/upgrade/${m.shadows[p0]}`).catch(() => null),
+    ]);
+    if (!alive) { meshes.forEach((b) => mod.disposeMesh(b.mesh)); return; }
+    const placed = meshes.filter((b) => groups[b.phase]);
+    meshes.filter((b) => !groups[b.phase]).forEach((b) => mod.disposeMesh(b.mesh));
+    for (const b of placed) { b.mesh.userData.upgrade = b; groups[b.phase].add(b.mesh); }
+    // Compile before hiding the boxes: three logs a failed shader instead of throwing, so check it here.
+    await renderer.compileAsync(scene, camera);
+    type ProgramInfo = { currentProgram?: { diagnostics?: { runnable: boolean } } };
+    const broken = placed.some((b) => (renderer.properties.get(b.mesh.material) as ProgramInfo).currentProgram?.diagnostics?.runnable === false);
+    if (broken || !alive) {
+      for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); }
+      if (broken) throw new Error("building shader failed to compile");
+      return;
+    }
+    upgradeMod = mod; manifest = m;
+    if (shade) shadows[p0] = shade;
+    for (const b of placed) {
+      upgraded.push(b.mesh);
+      for (const c of groups[b.phase].children) if (c.userData.boxes) c.visible = false;
+    }
+    groups.forEach(applyRise);
+    paint();
+    dirty = true;
+  };
+  let upgradeStarted = false;
+  const startUpgrade = () => {
+    if (upgradeStarted || !alive) return;
+    // film() captures and tour flights should not change meshes or stall mid-move; try again shortly.
+    if (frozen || flight) { clearTimeout(upgradeTimer); upgradeTimer = setTimeout(startUpgrade, UPGRADE_RETRY_MS); return; }
+    upgradeStarted = true;
+    clearTimeout(upgradeTimer);
+    for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade);
+    void upgrade().catch((e) => console.warn("Explorer upgrade skipped:", e));
+  };
+  let upgradeTimer = setTimeout(startUpgrade, UPGRADE_FALLBACK_MS);
+  for (const t of UPGRADE_TRIGGERS) window.addEventListener(t, startUpgrade, { passive: true });
+  stopUpgrade = () => { clearTimeout(upgradeTimer); for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade); };
   return api;
 }
