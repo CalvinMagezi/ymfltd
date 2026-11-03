@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Blender spike working files (ground textures, renders)
 /tools/blender/.work/
+/tools/blender/__pycache__/
+# Cycles on Metal leaves an empty kernel-cache folder in the working directory
+/cycles_metal_*/
