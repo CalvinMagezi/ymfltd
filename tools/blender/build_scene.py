@@ -164,7 +164,7 @@ class Terrain:
     """Height lookup on the explorer's DEM (hAt() in engine.ts), smoothed so a low sun does not show
     the 31 m grid cells as facets. Buildings and terrain sample the same surface, so nothing floats."""
 
-    def __init__(self, ctx):
+    def __init__(self, ctx, smooth=True):
         f = ctx["frame"]
         self.hw, self.hh = f["half_w"], f["half_h"]
         dem = np.array(ctx["dem"]["dm"], dtype=np.float64)
@@ -174,7 +174,8 @@ class Terrain:
         fine = np.linspace(0, n - 1, self.m)
         rows = np.array([np.interp(fine, np.arange(n), r) for r in dem])
         grid = np.array([np.interp(fine, np.arange(n), col) for col in rows.T]).T
-        self.g = box_blur(grid, TERRAIN_SMOOTH_RADIUS, TERRAIN_SMOOTH_PASSES)
+        # The live explorer uses the raw bilinear DEM, so its exports must not be smoothed.
+        self.g = box_blur(grid, TERRAIN_SMOOTH_RADIUS, TERRAIN_SMOOTH_PASSES) if smooth else grid
 
     def h(self, x, y):
         x, y = np.asarray(x, np.float64), np.asarray(y, np.float64)
@@ -854,4 +855,5 @@ def main():
     print(f"RENDER {a.view} {w}x{h} {a.samples}spp {time.time() - t1:.1f}s -> {out}")
 
 
-main()
+if __name__ == "__main__":
+    main()
