@@ -1,7 +1,9 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { CloseUpEntry } from "@/components/SplatCloseUp";
 import type { Explorer, Zone } from "@/lib/explore/engine";
 import { PHASES, TOUR, ZONE_INFO, ZONE_PROJECT } from "@/lib/content/zones";
 
@@ -12,6 +14,8 @@ type Card =
   | null;
 
 const PHASE_LABEL = ["Today", "Phase 1", "Phase 2", "Phase 3"];
+// The close-up viewer and Spark load only when a reader asks for a close-up.
+const SplatCloseUp = dynamic(() => import("@/components/SplatCloseUp"), { ssr: false });
 
 export default function ExploreClient() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,6 +29,8 @@ export default function ExploreClient() {
   const [zones, setZones] = useState<Zone[]>([]);
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [labels, setLabels] = useState(true);
+  const [closeUps, setCloseUps] = useState<Record<string, CloseUpEntry> | null>(null);
+  const [closeUp, setCloseUp] = useState<string | null>(null);
   const selectedId = card?.kind === "zone" ? card.zone.id : card?.kind === "tour" ? TOUR[card.i].zone : null;
 
   const setPhase = useCallback((p: number, animate = true) => {
@@ -101,6 +107,26 @@ export default function ExploreClient() {
   }, []);
 
   useEffect(() => { exRef.current?.showLabels(labels); }, [labels]);
+  // The close-up list is a few hundred bytes; fetch it once a card names an area.
+  useEffect(() => {
+    if (!selectedId || closeUps) return;
+    // On failure leave the list unset, so the next card tries again instead of hiding close-ups for the visit.
+    fetch("/explore/splat/manifest.json")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((m: { zones: Record<string, CloseUpEntry> }) => setCloseUps(m.zones), () => undefined);
+  }, [selectedId, closeUps]);
+  const closeUpEntry = selectedId ? closeUps?.[selectedId] : undefined;
+  const closeUpName = closeUp ? zones.find((z) => z.id === closeUp)?.name ?? "" : "";
+  const openerRef = useRef<HTMLElement | null>(null);
+  const openCloseUp = useCallback((zone: string) => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setCloseUp(zone);
+  }, []);
+  const closeCloseUp = useCallback(() => {
+    setCloseUp(null);
+    // The dialog makes the page inert while open; return focus once that is undone.
+    requestAnimationFrame(() => { if (openerRef.current?.isConnected) openerRef.current.focus(); });
+  }, []);
   useEffect(() => { setBudgetOpen(window.matchMedia("(min-width: 1024px)").matches); }, []);
 
   const closeCard = () => {
@@ -189,9 +215,10 @@ export default function ExploreClient() {
               <p className="eyebrow !text-gold">Area · {card.zone.acres} acres · {PHASE_LABEL[card.zone.phase]}</p>
               <h2 className="text-lg font-semibold">{card.zone.name}</h2>
               <p className="text-[15px] leading-snug">{ZONE_INFO[card.zone.id]}</p>
-              {ZONE_PROJECT[card.zone.id] && (
-                <div className="mt-1"><Link href={`/projects/${ZONE_PROJECT[card.zone.id]}`} className="btn">Read about this project</Link></div>
-              )}
+              <div className="mt-1 flex flex-wrap gap-2">
+                {closeUpEntry && <CloseUpButton bytes={closeUpEntry.bytes} onOpen={() => openCloseUp(card.zone.id)} />}
+                {ZONE_PROJECT[card.zone.id] && <Link href={`/projects/${ZONE_PROJECT[card.zone.id]}`} className="btn">Read about this project</Link>}
+              </div>
             </>
           )}
           {card.kind === "tour" && (
@@ -199,7 +226,8 @@ export default function ExploreClient() {
               <p className="eyebrow flex justify-between !text-gold"><span>Guided tour</span><span className="num">{card.i + 1} of {TOUR.length}</span></p>
               <h2 className="text-lg font-semibold">{TOUR[card.i].title}</h2>
               <p className="text-[15px] leading-snug">{TOUR[card.i].text}</p>
-              <div className="mt-1 flex justify-end gap-2">
+              <div className="mt-1 flex flex-wrap justify-end gap-2">
+                {closeUpEntry && <span className="mr-auto"><CloseUpButton bytes={closeUpEntry.bytes} onOpen={() => { const z = TOUR[card.i].zone; if (z) openCloseUp(z); }} /></span>}
                 <button type="button" className="btn" disabled={card.i === 0} onClick={() => goTour(card.i - 1)}>Back</button>
                 {card.i < TOUR.length - 1 ? (
                   <button type="button" className="btn btn-primary" onClick={() => goTour(card.i + 1)}>Next</button>
@@ -212,6 +240,8 @@ export default function ExploreClient() {
         </section>
       )}
 
+      {closeUp && closeUps?.[closeUp] && <SplatCloseUp name={closeUpName} entry={closeUps[closeUp]} onClose={closeCloseUp} />}
+
       {/* Tools */}
       <div className="absolute bottom-4 z-10 flex max-w-[calc(100%-2rem)] gap-2 overflow-x-auto max-sm:[&_.btn]:px-3 max-sm:[&_.btn]:text-[14px]" style={{ left: "max(16px, env(safe-area-inset-left, 0px))" }}>
         <button type="button" className="btn btn-primary !py-2.5 shadow" onClick={() => goTour(0)}>Tour</button>
@@ -220,5 +250,13 @@ export default function ExploreClient() {
         <button type="button" className="btn !py-2.5 shadow" aria-pressed={labels} onClick={() => setLabels((l) => !l)}>Labels</button>
       </div>
     </div>
+  );
+}
+
+function CloseUpButton({ bytes, onOpen }: { bytes: number; onOpen: () => void }) {
+  return (
+    <button type="button" className="btn" onClick={onOpen}>
+      See it up close <span className="num font-mono text-[12px] text-muted">{(bytes / 1e6).toFixed(1)} MB</span>
+    </button>
   );
 }
