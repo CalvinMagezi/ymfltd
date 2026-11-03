@@ -1,4 +1,7 @@
 /*
+ * Superseded on 3 Nov 2026: public/film is now rendered in Blender by tools/blender/render_film.py.
+ * Kept for a quick three.js preview of the film from the live explorer.
+ *
  * Renders the "land becomes the town" frame sequence for the home page (public/film).
  * It drives the real 3D explorer through its film(f, a, zoom) API, one frame per scroll step.
  *

@@ -18,12 +18,17 @@ import bpy
 import numpy as np
 from mathutils import Euler, Matrix, Vector
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from film_timing import frame_fa  # noqa: E402
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 SRC = os.path.join(ROOT, "public", "explore")
 WORK = os.path.join(ROOT, "tools", "blender", ".work")
 
 EXAG = 1.5  # vertical exaggeration used by the explorer
 TERRAIN_UPSAMPLE = 4  # DEM is about 31 m per cell; 4x gives smooth slopes under the buildings
+TERRAIN_SMOOTH_RADIUS = 2  # fine cells (about 8 m each) per side of the smoothing box
+TERRAIN_SMOOTH_PASSES = 2
 FOV_Y_DEG = 38
 # The public ground is painted light for the flat-lit explorer; under a real sun it needs more body.
 GROUND_SATURATION = 1.3
@@ -79,6 +84,10 @@ SQ_M_PER_ACRE = 4046.86
 VIEW_ZONE = dict(min_m=850, span=2.3, dir=(-0.38, 0.55, -0.74))
 VIEW_FILM = dict(yaw_dir=(0.78, 0.5), yaw0=0.36, yaw_sweep=0.46, d0_m=3150, d_sweep_m=800, up0=0.54, up_sweep=0.12)
 VIEW_SITE = {"hero": dict(d_m=3300, dir=(0.5, 0.38, 0.78)), "overview": dict(d_m=4200, dir=(-0.42, 0.6, -0.68))}
+SKIRT_COLOR = 0x6B5A45  # the explorer's skirt brown
+SKIRT_DEPTH_M = -70  # the explorer's terrain skirt and base plane sit here (engine.ts:127)
+# Phase state for the frame being built: f runs 0 (today) to 3 (all phases built).
+PHASE = {"f": 3.0}
 TREE_CROWN_R = {"ornamental": 4.2, "broad": 6.2}  # metres at plan scale 1, as engine.ts:358
 
 KIND = {
@@ -123,6 +132,11 @@ def args():
     p.add_argument("--sun-elev", type=float, default=11.0)
     p.add_argument("--sun-rot", type=float, default=300.0)
     p.add_argument("--save", default="", help="also save the .blend here")
+    p.add_argument("--frame", type=int, default=-1, help="film frame index; sets phase and camera")
+    p.add_argument("--zoom", type=float, default=1.0, help="film camera distance factor (phone set: 1.32)")
+    p.add_argument("--exposure", type=float, default=0.0)
+    p.add_argument("--look", default="AgX - Medium High Contrast", help="AgX look; film tests use Punchy")
+    p.add_argument("--transparent", action="store_true", help="transparent sky, to lay over the page colour")
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     return p.parse_args(argv)
 
@@ -134,23 +148,41 @@ def lin(hex_):
     return (c((hex_ >> 16) & 255), c((hex_ >> 8) & 255), c(hex_ & 255), 1.0)
 
 
+def box_blur(g, radius, passes):
+    """Separable box blur with edge padding; two passes approximate a smooth B-spline surface."""
+    k = 2 * radius + 1
+    for _ in range(passes):
+        for axis in (0, 1):
+            pad = np.pad(g, [(radius, radius) if a == axis else (0, 0) for a in (0, 1)], mode="edge")
+            c = np.cumsum(pad, axis=axis, dtype=np.float64)
+            c = np.concatenate([np.zeros_like(c.take([0], axis=axis)), c], axis=axis)
+            g = (c.take(range(k, c.shape[axis]), axis=axis) - c.take(range(0, c.shape[axis] - k), axis=axis)) / k
+    return g
+
+
 class Terrain:
-    """Bilinear height lookup identical to hAt() in engine.ts."""
+    """Height lookup on the explorer's DEM (hAt() in engine.ts), smoothed so a low sun does not show
+    the 31 m grid cells as facets. Buildings and terrain sample the same surface, so nothing floats."""
 
     def __init__(self, ctx):
         f = ctx["frame"]
         self.hw, self.hh = f["half_w"], f["half_h"]
-        self.dem = np.array(ctx["dem"]["dm"], dtype=np.float64)
-        self.n = self.dem.shape[0]
-        self.base = self.dem.min() / 10
+        dem = np.array(ctx["dem"]["dm"], dtype=np.float64)
+        self.base = dem.min() / 10
+        n = dem.shape[0]
+        self.m = (n - 1) * TERRAIN_UPSAMPLE + 1
+        fine = np.linspace(0, n - 1, self.m)
+        rows = np.array([np.interp(fine, np.arange(n), r) for r in dem])
+        grid = np.array([np.interp(fine, np.arange(n), col) for col in rows.T]).T
+        self.g = box_blur(grid, TERRAIN_SMOOTH_RADIUS, TERRAIN_SMOOTH_PASSES)
 
     def h(self, x, y):
         x, y = np.asarray(x, np.float64), np.asarray(y, np.float64)
-        n, d = self.n, self.dem
-        fx = (x + self.hw) / (2 * self.hw) * (n - 1)
-        fy = (self.hh - y) / (2 * self.hh) * (n - 1)
-        x0 = np.clip(np.floor(fx), 0, n - 2).astype(int)
-        y0 = np.clip(np.floor(fy), 0, n - 2).astype(int)
+        m, d = self.m, self.g
+        fx = (x + self.hw) / (2 * self.hw) * (m - 1)
+        fy = (self.hh - y) / (2 * self.hh) * (m - 1)
+        x0 = np.clip(np.floor(fx), 0, m - 2).astype(int)
+        y0 = np.clip(np.floor(fy), 0, m - 2).astype(int)
         tx = np.clip(fx - x0, 0, 1)
         ty = np.clip(fy - y0, 0, 1)
         a, b, c, e = d[y0, x0], d[y0, x0 + 1], d[y0 + 1, x0], d[y0 + 1, x0 + 1]
@@ -330,7 +362,7 @@ def mesh_object(name, verts, faces, mats, face_mats, uvs=None, smooth=False):
 
 
 def build_terrain(T, mat):
-    m = (T.n - 1) * TERRAIN_UPSAMPLE + 1
+    m = T.m
     xs = np.linspace(-T.hw, T.hw, m)
     ys = np.linspace(T.hh, -T.hh, m)
     gx, gy = np.meshgrid(xs, ys)
@@ -353,6 +385,24 @@ def build_terrain(T, mat):
     me.materials.append(mat)
     ob = bpy.data.objects.new("terrain", me)
     bpy.context.scene.collection.objects.link(ob)
+    build_skirt(gx, gy, gz, m)
+
+
+def build_skirt(gx, gy, gz, m):
+    """Side walls down to a base plane so wide views show a model block, not a paper-thin edge."""
+    edge = [(0, j) for j in range(m)] + [(i, m - 1) for i in range(1, m)]
+    edge += [(m - 1, j) for j in range(m - 2, -1, -1)] + [(i, 0) for i in range(m - 2, -1, -1)]
+    verts, faces = [], []
+    for i, j in edge:
+        verts += [(gx[i, j], gy[i, j], gz[i, j]), (gx[i, j], gy[i, j], SKIRT_DEPTH_M)]
+    for k in range(len(edge) - 1):
+        a = 2 * k
+        faces.append((a, a + 2, a + 3, a + 1))
+    corners = [(gx[0, 0], gy[0, 0]), (gx[0, -1], gy[0, -1]), (gx[-1, -1], gy[-1, -1]), (gx[-1, 0], gy[-1, 0])]
+    b = len(verts)
+    verts += [(x, y, SKIRT_DEPTH_M) for x, y in corners]
+    faces.append((b, b + 3, b + 2, b + 1))
+    mesh_object("skirt", verts, faces, [plain_material("skirt", lin(SKIRT_COLOR), 0.9)], [0] * len(faces))
 
 
 class Builder:
@@ -381,6 +431,24 @@ class Builder:
             self.quad([(a.x, a.y, z0), (b.x, b.y, z0), (b.x, b.y, z1), (a.x, a.y, z1)],
                       [(s, z0 - zg), (s + ln, z0 - zg), (s + ln, z1 - zg), (s, z1 - zg)], mat)
             s += ln
+
+
+def phase_rise(k):
+    """Height factor for phase k at the current f, eased as applyRise() in engine.ts; 0 means not shown."""
+    amt = 1.0 if k <= 0 else max(0.0, min(1.0, PHASE["f"] - (k - 1)))
+    return 0.0 if amt <= 0 else 1 - (1 - amt) ** 3
+
+
+def rise_verts(verts, start, z0, e):
+    """Squash the vertices from start onwards toward z0, so a building grows from its own footing."""
+    for i in range(start, len(verts)):
+        x, y, z = verts[i]
+        verts[i] = (x, y, z0 + (z - z0) * e)
+
+
+def rise_objects(obs, e):
+    for ob in obs:
+        ob.scale.z *= e
 
 
 def plain_key(kind):
@@ -414,12 +482,13 @@ def add_building(B, solar, slot, n, b, T):
     h0 = float(T.h(x, y))
     slope = max(abs(float(T.h(x + w / 2, y)) - h0), abs(float(T.h(x, y + d / 2)) - h0))
     zt = h0 + hgt
+    z0 = h0 - slope - FOOTING_M
     ax, ay = axes(rot)
     c = Vector((x, y))
     hx, hy = w / 2, d / 2
     outer = rect(c, ax, ay, hx, hy)
     trim = slot(plain_key(kind))
-    B.walls(outer, h0 - slope - FOOTING_M, zt, h0, slot(f"facade_{kind}" if kind in FACADE else plain_key(kind)))
+    B.walls(outer, z0, zt, h0, slot(f"facade_{kind}" if kind in FACADE else plain_key(kind)))
     ix, iy = hx - PARAPET_INSET, hy - PARAPET_INSET
     inner = rect(c, ax, ay, ix, iy)
     zr = zt - PARAPET_DROP
@@ -442,13 +511,21 @@ def add_building(B, solar, slot, n, b, T):
     if kind == "hospital" and w > CANOPY_MIN_WIDTH_M:
         cc = c - ay * (hy + CANOPY_HALF_DEPTH_M)
         B.box(cc, ax, ay, w * CANOPY_HALF_WIDTH, CANOPY_HALF_DEPTH_M, h0 + CANOPY_Z_M[0], h0 + CANOPY_Z_M[1], trim, trim)
+    return z0
 
 
 def build_boxes(plan, T, mats):
     """Every plan box becomes a building in one joined mesh; roof panels go in a second mesh."""
     B, solar, slot = Builder(), Builder(), MaterialSlots()
     for n, b in enumerate(plan["boxes"]):
-        add_building(B, solar, slot, n, b, T)
+        e = phase_rise(b[7])
+        if e <= 0:
+            continue
+        v0, s0 = len(B.v), len(solar.v)
+        z0 = add_building(B, solar, slot, n, b, T)
+        if e < 1:
+            rise_verts(B.v, v0, z0, e)
+            rise_verts(solar.v, s0, z0, e)
     ob = mesh_object("buildings", B.v, B.f, [mats[k] for k in slot.names()], B.mi, B.uv)
     if solar.f:
         mesh_object("solar", solar.v, solar.f, [mats["solar"]], solar.mi, solar.uv)
@@ -497,7 +574,10 @@ def cone(bm, r1, r2, depth, z, segs=24, caps=True, sx=1.0, sy=1.0):
 
 def build_cylinders(plan, T, mats):
     for i, c in enumerate(plan["cyl"]):
-        x, y, r, h, kind, _, typ = c
+        x, y, r, h, kind, ph, typ = c
+        e = phase_rise(ph)
+        if e <= 0:
+            continue
         g = float(T.h(x, y))
         bm = bmesh.new()
         if typ == 2:
@@ -508,21 +588,23 @@ def build_cylinders(plan, T, mats):
         else:
             cone(bm, r, r, h + 0.5, -0.5)
         # Domes are always biogas digesters in the explorer, whatever kind the plan gives them.
-        bm_object(f"cyl{i}", bm, mats[plain_key("biogas" if typ == 2 else kind)], (x, y, g))
+        obs = [bm_object(f"cyl{i}", bm, mats[plain_key("biogas" if typ == 2 else kind)], (x, y, g))]
         if typ == 1:
             bm = bmesh.new()
             cone(bm, r * 1.25, 0, r * 0.9, h)
-            bm_object(f"roof{i}", bm, mats["thatch"], (x, y, g))
+            obs.append(bm_object(f"roof{i}", bm, mats["thatch"], (x, y, g)))
         elif kind == "silo":
             bm = bmesh.new()
             geom = bmesh.ops.create_uvsphere(bm, u_segments=24, v_segments=8, radius=r)
             for v in geom["verts"]:
                 v.co.z = max(v.co.z, 0) * 0.5 + h
-            bm_object(f"cap{i}", bm, mats[plain_key(kind)], (x, y, g))
+            obs.append(bm_object(f"cap{i}", bm, mats[plain_key(kind)], (x, y, g)))
+        rise_objects(obs, e)
 
 
 def build_arena(a, T, mats):
-    if not a:
+    rise = phase_rise(a["ph"]) if a else 0.0
+    if rise <= 0:
         return
     A = ARENA
     loc, rot = (a["x"], a["y"], float(T.h(a["x"], a["y"]))), a["a"]
@@ -531,12 +613,12 @@ def build_arena(a, T, mats):
     cone(bm, A["wall_flare"], 1.0, 1, 0, A["segs"], False)
     bmesh.ops.scale(bm, vec=(rx, ry, h + A["wall_sink_m"]), verts=bm.verts)
     bmesh.ops.translate(bm, vec=(0, 0, -A["wall_sink_m"]), verts=bm.verts)
-    bm_object("arena_wall", bm, mats["arena_wall"], loc, rot)
+    obs = [bm_object("arena_wall", bm, mats["arena_wall"], loc, rot)]
     bm = bmesh.new()
     cone(bm, A["bowl_base"], 1.0, 1, 0, A["segs"], False)
     bmesh.ops.scale(bm, vec=(rx * A["bowl_r"], ry * A["bowl_r"], h * A["bowl_h"]), verts=bm.verts)
     bmesh.ops.translate(bm, vec=(0, 0, A["bowl_lift_m"]), verts=bm.verts)
-    bm_object("arena_seats", bm, mats["arena_seats"], loc, rot)
+    obs.append(bm_object("arena_seats", bm, mats["arena_seats"], loc, rot))
     bm = bmesh.new()
     angles = np.linspace(0, 2 * math.pi, A["roof_segs"], endpoint=False)
     z = h + A["roof_lift_m"]
@@ -545,12 +627,13 @@ def build_arena(a, T, mats):
     for i in range(len(angles)):
         j = (i + 1) % len(angles)
         bm.faces.new((outer[i], outer[j], inner[j], inner[i]))
-    bm_object("arena_roof", bm, mats["arena_wall"], loc, rot)
+    obs.append(bm_object("arena_roof", bm, mats["arena_wall"], loc, rot))
     bm = bmesh.new()
     bmesh.ops.create_circle(bm, cap_ends=True, segments=A["pitch_segs"], radius=1)
     bmesh.ops.scale(bm, vec=(rx * A["pitch_rx"], ry * A["pitch_ry"], 1), verts=bm.verts)
     bmesh.ops.translate(bm, vec=(0, 0, A["pitch_lift_m"]), verts=bm.verts)
-    bm_object("arena_pitch", bm, mats["pitch"], loc, rot)
+    obs.append(bm_object("arena_pitch", bm, mats["pitch"], loc, rot))
+    rise_objects(obs, rise)
 
 
 def tree_prototypes(leaf, bark):
@@ -603,7 +686,10 @@ def build_trees(plan, T, protos):
     col = bpy.data.collections.new("trees")
     bpy.context.scene.collection.children.link(col)
     for i, t in enumerate(plan["trees"]):
-        x, y, s, typ = t[0], t[1], t[2], t[3]
+        x, y, s, typ, ph = t[0], t[1], t[2], t[3], t[4]
+        e = phase_rise(ph)
+        if e <= 0:
+            continue
         if typ == 1:
             me, r = protos["bamboo"], s
         elif typ == 2:
@@ -613,7 +699,7 @@ def build_trees(plan, T, protos):
         ob = bpy.data.objects.new(f"t{i}", me)
         ob.location = (x, y, float(T.h(x, y)))
         ob.rotation_euler = (0, 0, (x * TREE_YAW[0] + y * TREE_YAW[1]) % TREE_YAW[2])
-        ob.scale = (r, r, r)
+        ob.scale = (r, r, r * e)
         col.objects.link(ob)
 
 
@@ -660,7 +746,7 @@ def world(elev, rot):
     print("sky type", sky.sky_type)
 
 
-def camera_for(view, plan, T):
+def camera_for(view, plan, T, a=1.0, zoom=1.0):
     """The explorer's named views, converted from three.js offsets (dx, dy, dz) to Blender (dx, -dz, dy)."""
     zones = plan["zones"]
     pts = [q for z in zones for p in z["polys"] for q in p["o"]]
@@ -673,11 +759,11 @@ def camera_for(view, plan, T):
         d = max(V["min_m"], math.sqrt(z["acres"] * SQ_M_PER_ACRE) * V["span"])
         off = tuple(k * d for k in V["dir"])
     elif view == "film":
-        # film(f, a) at its last frame: a = 1, so the eased camera sits at the end of its arc.
-        F, e = VIEW_FILM, 1.0
+        # film(f, a, zoom): a runs 0 to 1 along an eased arc; zoom only scales the distance.
+        F, e = VIEW_FILM, a * a * (3 - 2 * a)
         tx, ty = mx, my
         yaw = math.atan2(*F["yaw_dir"]) + F["yaw0"] - F["yaw_sweep"] * e
-        d, up = F["d0_m"] - F["d_sweep_m"] * e, F["up0"] - F["up_sweep"] * e
+        d, up = (F["d0_m"] - F["d_sweep_m"] * e) * zoom, F["up0"] - F["up_sweep"] * e
         off = (math.cos(yaw) * d, up * d, math.sin(yaw) * d)
     else:
         V = VIEW_SITE.get(view, VIEW_SITE["overview"])
@@ -703,6 +789,9 @@ def setup_camera(t, p, w, h):
     r.resolution_x, r.resolution_y, r.resolution_percentage = w, h, 100
 
 
+LOOK = {"name": "AgX - Medium High Contrast"}
+
+
 def setup_cycles(samples):
     sc = bpy.context.scene
     sc.render.engine = "CYCLES"
@@ -721,7 +810,7 @@ def setup_cycles(samples):
     sc.render.use_persistent_data = True
     sc.view_settings.view_transform = "AgX"
     try:
-        sc.view_settings.look = "AgX - Medium High Contrast"
+        sc.view_settings.look = LOOK["name"]
     except TypeError:
         print("WARNING: AgX contrast look missing, rendering with the default look")
     sc.render.image_settings.file_format = "PNG"
@@ -731,6 +820,10 @@ def setup_cycles(samples):
 def main():
     a = args()
     t0 = time.time()
+    progress = 1.0
+    if a.frame >= 0:
+        PHASE["f"], progress = frame_fa(a.frame)
+        a.view = "film"
     bpy.ops.wm.read_factory_settings(use_empty=True)
     plan = json.load(open(f"{SRC}/plan.json"))
     ctx = json.load(open(f"{SRC}/context.json"))
@@ -743,8 +836,13 @@ def main():
     build_trees(plan, T, tree_prototypes(mats["leaf"], mats["bark"]))
     world(a.sun_elev, a.sun_rot)
     w, h = (int(v) for v in a.res.split("x"))
-    setup_camera(*camera_for(a.view, plan, T), w, h)
+    setup_camera(*camera_for(a.view, plan, T, progress, a.zoom), w, h)
+    LOOK["name"] = a.look
     setup_cycles(a.samples)
+    bpy.context.scene.view_settings.exposure = a.exposure
+    bpy.context.scene.render.film_transparent = a.transparent
+    if a.transparent:
+        bpy.context.scene.render.image_settings.color_mode = "RGBA"
     print(f"built in {time.time() - t0:.1f}s")
     if a.save:
         bpy.ops.wm.save_as_mainfile(filepath=a.save)

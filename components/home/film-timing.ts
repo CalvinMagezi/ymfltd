@@ -3,7 +3,8 @@ const smooth = (x: number) => x * x * (3 - 2 * x);
 
 /**
  * Phase (0 today to 3 complete) shown at film progress p.
- * Same timing as the rendered frames (tools/film/render-frames.cjs): a short hold on today, then three eased phases.
+ * Same timing as the rendered frames (tools/blender/film_timing.py, used by render_film.py): a short hold on today,
+ * then three eased phases.
  */
 export function filmPhase(p: number) {
   const u = clamp01((p - 0.1) / 0.82) * 3;
