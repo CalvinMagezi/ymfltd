@@ -45,3 +45,5 @@ next-env.d.ts
 /tools/blender/__pycache__/
 # Cycles on Metal leaves an empty kernel-cache folder in the working directory
 /cycles_metal_*/
+# Brush (splat trainer) writes its GPU autotune cache to the working directory
+/target/
