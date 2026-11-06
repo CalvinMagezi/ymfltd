@@ -46,6 +46,19 @@ const EXAG = 1.5;
 const UPGRADE_FALLBACK_MS = 12000;
 const UPGRADE_TRIGGERS = ["pointerdown", "wheel", "keydown", "touchstart"] as const;
 const UPGRADE_RETRY_MS = 1000; // wait out a flight or a film capture before swapping meshes
+const UPGRADE_REST_MS = 250; // the swap waits for the camera to sit still this long, so it never lands mid-gesture
+// Wheel zoom eases toward the cursor instead of jumping one step per notch.
+const WHEEL_ZOOM_RATE = 0.0015; // log-distance per pixel of wheel delta
+const PINCH_ZOOM_RATE = 0.01; // trackpad pinch arrives as ctrl+wheel with much smaller deltas
+const WHEEL_LINE_PX = 16;
+const WHEEL_PAGE_PX = 800;
+const ZOOM_EASE_MS = 90; // time constant of the zoom easing
+const ZOOM_EPS = 2e-3; // below 0.2% of distance the rest is applied in one step
+const ANCHOR_MOVE_PX = 4; // re-pick the zoom anchor on the terrain only after the cursor moves this far
+const PAN_MARGIN_M = 500;
+// Flights scale with how far they travel and zoom, inside these bounds.
+const FLIGHT_MIN_MS = 700;
+const FLIGHT_MAX_MS = 2200;
 const KIND: Record<string, number> = {
   hospital: 0xf4f1ec, library: 0xc98f5a, museum: 0xd8b48a, commercial: 0xe7d7ef, hotel: 0xf3e3bd, villa: 0xf6efe0,
   apartment: 0xf2e8d8, townhouse: 0xe9d3b1, university: 0xdfe4fb, warehouse: 0xcfd2c6, barn: 0xb5532f, processing: 0xe8e2cf,
@@ -100,7 +113,9 @@ export async function createExplorer(
   };
 
   // ---------- renderer ----------
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  // No preserveDrawingBuffer: tools/film reads the canvas in the same task it renders, and keeping the
+  // buffer costs phones a full-screen copy every frame.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.small ? 1.5 : 2));
   const S = Math.min(opts.small ? 2048 : 4096, renderer.capabilities.maxTextureSize);
   const K = S / (2 * HW);
@@ -412,7 +427,7 @@ export async function createExplorer(
   };
 
   // ---------- labels ----------
-  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number };
+  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number; on?: boolean; dim?: boolean; tf?: string };
   const labels: Lbl[] = [];
   const placed: number[][] = [];
   // Draw only when something changed (camera, flight, rising buildings, a call to the API), so a still
@@ -435,18 +450,71 @@ export async function createExplorer(
   for (const l of ctx.landmarks) addLabel(l.n, l.x, l.y, "mark");
 
   // ---------- camera ----------
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.maxPolarAngle = 1.38; controls.minDistance = 120; controls.maxDistance = 11000;
   controls.screenSpacePanning = false;
   let flight: any = null;
+  let zoomLog = 0; // pending wheel zoom, as log of the distance factor still to apply
+  const zoomAnchor = new THREE.Vector3();
+  let anchorAt: [number, number] | null = null;
+  let interacting = false, moving = false, restSince = performance.now();
+  // A drag or pinch takes over from a flight at once instead of fighting it for the rest of its run.
+  controls.addEventListener("start", () => { interacting = true; flight = null; });
+  controls.addEventListener("end", () => { interacting = false; });
   const flyTo = (t: THREE.Vector3, p: THREE.Vector3, ms: number) => {
-    if (opts.reduceMotion || !ms) { controls.target.copy(t); camera.position.copy(p); controls.update(); return; }
-    flight = { t0: performance.now(), ms, fromT: controls.target.clone(), fromP: camera.position.clone(), toT: t, toP: p };
+    zoomLog = 0;
+    if (opts.reduceMotion || !ms) { flight = null; controls.target.copy(t); camera.position.copy(p); controls.update(); return; }
+    const fromT = controls.target.clone();
+    const fromO = camera.position.clone().sub(fromT), toO = p.clone().sub(t);
+    const d0 = fromO.length(), d1 = toO.length();
+    const k = Math.abs(Math.log(d1 / d0)) + fromT.distanceTo(t) / Math.max(d0, d1);
+    const dur = Math.min(FLIGHT_MAX_MS, Math.max(FLIGHT_MIN_MS, ms * (0.55 + 0.45 * k)));
+    flight = { t0: performance.now(), ms: dur, fromT, toT: t, fromDir: fromO.normalize(), toDir: toO.normalize(), d0, d1 };
   };
+  const dirTmp = new THREE.Vector3();
+  // Target moves in a straight line while distance eases on a log scale, so a long zoom feels even.
+  const stepFlight = (now: number) => {
+    const t = Math.min(1, (now - flight.t0) / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    controls.target.lerpVectors(flight.fromT, flight.toT, e);
+    dirTmp.lerpVectors(flight.fromDir, flight.toDir, e).normalize();
+    camera.position.copy(controls.target).addScaledVector(dirTmp, flight.d0 * Math.pow(flight.d1 / flight.d0, e));
+    if (t >= 1) flight = null;
+  };
+  const pickAnchor = (clientX: number, clientY: number) => {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObject(terrain)[0];
+    zoomAnchor.copy(hit ? hit.point : controls.target);
+    anchorAt = [clientX, clientY];
+  };
+  const applyZoom = (logStep: number) => {
+    const d = camera.position.distanceTo(controls.target);
+    const nd = Math.min(controls.maxDistance, Math.max(controls.minDistance, d * Math.exp(logStep)));
+    const s = nd / d;
+    camera.position.sub(zoomAnchor).multiplyScalar(s).add(zoomAnchor);
+    controls.target.sub(zoomAnchor).multiplyScalar(s).add(zoomAnchor);
+    return s !== 1;
+  };
+  const onWheel = (e: WheelEvent) => {
+    // Runs before OrbitControls' own wheel handler, which steps the zoom without easing.
+    e.preventDefault(); e.stopImmediatePropagation();
+    flight = null;
+    const unit = e.deltaMode === 1 ? WHEEL_LINE_PX : e.deltaMode === 2 ? WHEEL_PAGE_PX : 1;
+    const step = e.deltaY * unit * (e.ctrlKey ? PINCH_ZOOM_RATE : WHEEL_ZOOM_RATE);
+    if (!anchorAt || Math.hypot(e.clientX - anchorAt[0], e.clientY - anchorAt[1]) > ANCHOR_MOVE_PX) pickAnchor(e.clientX, e.clientY);
+    if (opts.reduceMotion) { applyZoom(step); controls.update(); } else zoomLog += step;
+    dirty = true;
+  };
+  canvas.addEventListener("wheel", onWheel, { capture: true, passive: false });
   const all = zones.flatMap((z) => z.polys.flatMap((p) => p.o));
   const minX = Math.min(...all.map((q) => q[0])), maxX = Math.max(...all.map((q) => q[0]));
   const minY = Math.min(...all.map((q) => q[1])), maxY = Math.max(...all.map((q) => q[1]));
+  // Panning stops a little past the site, so the town can never be dragged out of view.
+  const panX0 = Math.max(-HW, minX - PAN_MARGIN_M), panX1 = Math.min(HW, maxX + PAN_MARGIN_M);
+  const panZ0 = Math.max(-HH, -maxY - PAN_MARGIN_M), panZ1 = Math.min(HH, -minY + PAN_MARGIN_M);
   const overviewView = (): [THREE.Vector3, THREE.Vector3] => {
     const mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
     const narrow = canvas.clientWidth < 700;
@@ -462,7 +530,6 @@ export async function createExplorer(
   };
 
   // ---------- picking ----------
-  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   let down: [number, number] | null = null;
   const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
   const onUp = (e: PointerEvent) => {
@@ -497,15 +564,19 @@ export async function createExplorer(
   const loop = (now: number) => {
     if (!alive) return;
     const dt = now - last; last = now;
-    if (flight) {
-      const t = Math.min(1, (now - flight.t0) / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      controls.target.lerpVectors(flight.fromT, flight.toT, e); camera.position.lerpVectors(flight.fromP, flight.toP, e);
-      if (t >= 1) flight = null;
+    if (flight) { stepFlight(now); dirty = true; }
+    if (zoomLog) {
+      const step = Math.abs(zoomLog) < ZOOM_EPS ? zoomLog : zoomLog * (1 - Math.exp(-dt / ZOOM_EASE_MS));
+      zoomLog -= step;
+      if (!applyZoom(step)) zoomLog = 0; // at the distance limit, drop the rest
       dirty = true;
     }
-    controls.target.x = Math.max(-HW, Math.min(HW, controls.target.x));
-    controls.target.z = Math.max(-HH, Math.min(HH, controls.target.z));
-    if (controls.update()) dirty = true;
+    // Clamp by moving camera and target together; moving the target alone would tilt the view at the edge.
+    const ox = Math.max(panX0, Math.min(panX1, controls.target.x)) - controls.target.x;
+    const oz = Math.max(panZ0, Math.min(panZ1, controls.target.z)) - controls.target.z;
+    if (ox || oz) { controls.target.x += ox; controls.target.z += oz; camera.position.x += ox; camera.position.z += oz; }
+    moving = controls.update();
+    if (moving || flight || zoomLog || interacting) { restSince = now; if (moving) dirty = true; }
     if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); dirty = true; }
     if (!dirty) { raf = requestAnimationFrame(loop); return; }
     dirty = false;
@@ -519,15 +590,18 @@ export async function createExplorer(
       let vis = labelsOn && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05 && !(l.zone && dist > 9000);
       const x = ((tmp.x + 1) / 2) * w, y = ((1 - tmp.y) / 2) * h;
       if (vis) {
-        if (!l.w) { l.el.style.display = ""; l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
+        if (!l.w) { l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
         const bw = l.w || 60, bh = l.h || 24;
         const box = [x - bw / 2 - 3, y - bh - 3, x + bw / 2 + 3, y + 3];
         if (placed.some((q) => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) vis = false;
         else placed.push(box);
       }
-      l.el.style.display = vis ? "" : "none";
-      if (vis) l.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
-      if (l.zone) l.el.style.opacity = l.zone.phase <= phase ? "1" : "0.72";
+      // Fade rather than toggle display, so labels culled for overlap do not flicker while the camera moves.
+      if (vis !== l.on) { l.on = vis; l.el.classList.toggle("on", vis); }
+      const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+      if (tf !== l.tf) { l.tf = tf; l.el.style.transform = tf; } // keep moving while it fades out
+      const dim = !!l.zone && l.zone.phase > phase;
+      if (dim !== l.dim) { l.dim = dim; l.el.classList.toggle("dim", dim); }
     }
     raf = requestAnimationFrame(loop);
   };
@@ -569,10 +643,10 @@ export async function createExplorer(
           ? t.clone().add(new THREE.Vector3(0.5 * d, 0.38 * d, 0.78 * d))
           : t.clone().add(new THREE.Vector3(-0.42 * d, 0.6 * d, -0.68 * d));
       }
-      flight = null; controls.target.copy(t); camera.position.copy(p); controls.update();
+      flight = null; zoomLog = 0; controls.target.copy(t); camera.position.copy(p); controls.update();
     },
     film(f, a, zoom = 1) {
-      frozen = true; labelsOn = false; selected = null; flight = null;
+      frozen = true; labelsOn = false; selected = null; flight = null; zoomLog = 0;
       phaseF = Math.max(0, Math.min(3, f)); phase = Math.floor(phaseF + 1e-6); ovl = 0.28;
       paint();
       groups.forEach((g, k) => {
@@ -592,6 +666,7 @@ export async function createExplorer(
     dispose() {
       alive = false; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("wheel", onWheel, { capture: true });
       stopUpgrade();
       for (const m of upgraded) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
       controls.dispose(); renderer.dispose(); labelsEl.innerHTML = "";
@@ -632,6 +707,11 @@ export async function createExplorer(
       if (broken) throw new Error("building shader failed to compile");
       return;
     }
+    // Hold the visible swap until the camera is still, so boxes never turn into buildings mid-gesture.
+    while (alive && (flight || zoomLog || interacting || frozen || performance.now() - restSince < UPGRADE_REST_MS)) {
+      await new Promise((r) => setTimeout(r, UPGRADE_REST_MS));
+    }
+    if (!alive) { for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); } return; }
     upgradeMod = mod; manifest = m;
     if (shade) shadows[p0] = shade;
     for (const b of placed) {
@@ -649,11 +729,12 @@ export async function createExplorer(
     if (frozen || flight) { clearTimeout(upgradeTimer); upgradeTimer = setTimeout(startUpgrade, UPGRADE_RETRY_MS); return; }
     upgradeStarted = true;
     clearTimeout(upgradeTimer);
-    for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade);
+    for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade, true);
     void upgrade().catch((e) => console.warn("Explorer upgrade skipped:", e));
   };
   let upgradeTimer = setTimeout(startUpgrade, UPGRADE_FALLBACK_MS);
-  for (const t of UPGRADE_TRIGGERS) window.addEventListener(t, startUpgrade, { passive: true });
-  stopUpgrade = () => { clearTimeout(upgradeTimer); for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade); };
+  // Capture phase, since the wheel handler stops the event before it would bubble to window.
+  for (const t of UPGRADE_TRIGGERS) window.addEventListener(t, startUpgrade, { passive: true, capture: true });
+  stopUpgrade = () => { clearTimeout(upgradeTimer); for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade, true); };
   return api;
 }
