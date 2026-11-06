@@ -56,6 +56,15 @@ const ZOOM_EASE_MS = 90; // time constant of the zoom easing
 const ZOOM_EPS = 2e-3; // below 0.2% of distance the rest is applied in one step
 const ANCHOR_MOVE_PX = 4; // re-pick the zoom anchor on the terrain only after the cursor moves this far
 const PAN_MARGIN_M = 500;
+const MAX_RISE_STEP_MS = 34;
+const NARROW_PX = 700; // same breakpoint the overview uses
+const NARROW_LIFT = 0.32; // share of the view distance to aim short of a zone on phones
+// The selected zone's outline is a ribbon draped over the terrain, so selecting never repaints the
+// 2048 px ground texture (about 300 ms of GPU time on a Mali-G52 phone).
+const OUTLINE_HALO_M = 10;
+const OUTLINE_CORE_M = 5;
+const OUTLINE_LIFT_M = 3.5; // clears the gap between the bilinear height and the terrain triangles
+const OUTLINE_STEP_M = 12; // segments are split this finely so the ribbon follows the ground between corners
 // Flights scale with how far they travel and zoom, inside these bounds.
 const FLIGHT_MIN_MS = 700;
 const FLIGHT_MAX_MS = 2200;
@@ -309,11 +318,6 @@ export async function createExplorer(
         L.strokeStyle = `rgba(240, 236, 224, ${(0.75 * ovl * (1 - ra)).toFixed(3)})`; L.lineWidth = 3 * K; L.setLineDash([8 * K, 8 * K]); L.stroke(); L.setLineDash([]);
       }
     }
-    if (selected) {
-      zonePath(L, selected);
-      L.strokeStyle = "rgba(255, 255, 255, 0.95)"; L.lineWidth = 8 * K; L.stroke();
-      L.strokeStyle = selected.color; L.lineWidth = 4 * K; L.stroke();
-    }
     // feather the outside edge of the site
     L.globalCompositeOperation = "destination-in";
     L.drawImage(maskCanvas, 0, 0);
@@ -426,6 +430,55 @@ export async function createExplorer(
     });
   };
 
+  // Same program as the skirt (Lambert, double sided, no map), so the first selection compiles nothing new.
+  const outlineMat = (c: string | number, order: number) => new THREE.MeshLambertMaterial({
+    color: 0x000000, emissive: new THREE.Color(c), side: THREE.DoubleSide, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2 * order, polygonOffsetUnits: -2 * order,
+  });
+  const ribbon = (rings: number[][][], width: number, mat: THREE.Material, order: number) => {
+    const pos: number[] = [], idx: number[] = [];
+    for (const r of rings) {
+      const pts: number[][] = [];
+      for (let i = 0; i < r.length; i++) {
+        const a = r[i], b = r[(i + 1) % r.length];
+        const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / OUTLINE_STEP_M));
+        for (let k = 0; k < n; k++) pts.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+      }
+      const base = pos.length / 3;
+      pts.forEach((q, i) => {
+        const pr = pts[(i - 1 + pts.length) % pts.length], nx = pts[(i + 1) % pts.length];
+        let dx = nx[0] - pr[0], dy = nx[1] - pr[1];
+        const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+        const ox = -dy * (width / 2), oy = dx * (width / 2);
+        for (const sgn of [1, -1]) {
+          const x = q[0] + sgn * ox, y = q[1] + sgn * oy;
+          pos.push(x, hAt(x, y) + OUTLINE_LIFT_M, -y);
+        }
+        const a = base + 2 * i, b = base + 2 * ((i + 1) % pts.length);
+        idx.push(a, a + 1, b, a + 1, b + 1, b);
+      });
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(new Float32Array(pos.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    geo.setIndex(idx);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.renderOrder = order;
+    return mesh;
+  };
+  const outline = new THREE.Group();
+  scene.add(outline);
+  const haloMat = outlineMat(0xffffff, 1);
+  const coreMat = outlineMat(0xffffff, 2);
+  const setOutline = (z: Zone | null) => {
+    for (const c of outline.children) (c as THREE.Mesh).geometry.dispose();
+    outline.clear();
+    if (!z) return;
+    const rings = z.polys.flatMap((p) => [p.o, ...p.h]);
+    coreMat.emissive.set(z.color);
+    outline.add(ribbon(rings, OUTLINE_HALO_M, haloMat, 1), ribbon(rings, OUTLINE_CORE_M, coreMat, 2));
+  };
+
   // ---------- labels ----------
   type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number; on?: boolean; dim?: boolean; tf?: string };
   const labels: Lbl[] = [];
@@ -517,7 +570,7 @@ export async function createExplorer(
   const panZ0 = Math.max(-HH, -maxY - PAN_MARGIN_M), panZ1 = Math.min(HH, -minY + PAN_MARGIN_M);
   const overviewView = (): [THREE.Vector3, THREE.Vector3] => {
     const mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
-    const narrow = canvas.clientWidth < 700;
+    const narrow = canvas.clientWidth < NARROW_PX;
     const t = new THREE.Vector3(mx, hAt(mx, my), -my - (narrow ? 250 : 450));
     if (narrow) { const d = 7600; return [t, t.clone().add(new THREE.Vector3(-0.12 * d, 0.86 * d, -0.5 * d))]; }
     const d = 4700;
@@ -526,7 +579,10 @@ export async function createExplorer(
   const zoneView = (z: Zone): [THREE.Vector3, THREE.Vector3] => {
     const t = new THREE.Vector3(z.label[0], hAt(z.label[0], z.label[1]), -z.label[1]);
     const d = Math.max(1350, Math.sqrt(z.acres * 4046.86) * 3.2);
-    return [t, t.clone().add(new THREE.Vector3(-0.35 * d, 0.62 * d, -0.78 * d))];
+    const off = new THREE.Vector3(-0.35 * d, 0.62 * d, -0.78 * d);
+    // On phones the info card covers the lower half, so aim short of the zone to lift it above the card.
+    if (canvas.clientWidth < NARROW_PX) t.addScaledVector(new THREE.Vector3(off.x, 0, off.z).normalize(), NARROW_LIFT * d);
+    return [t, t.clone().add(off)];
   };
 
   // ---------- picking ----------
@@ -577,7 +633,10 @@ export async function createExplorer(
     if (ox || oz) { controls.target.x += ox; controls.target.z += oz; camera.position.x += ox; camera.position.z += oz; }
     moving = controls.update();
     if (moving || flight || zoomLog || interacting) { restSince = now; if (moving) dirty = true; }
-    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); dirty = true; }
+    // A phase change re-uploads the ground texture (about 300 ms on a Mali-G52); capping the step makes
+    // the buildings start rising after that pause instead of jumping a third of the way.
+    const riseDt = Math.min(dt, MAX_RISE_STEP_MS);
+    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + riseDt / 900); applyRise(g); dirty = true; }
     if (!dirty) { raf = requestAnimationFrame(loop); return; }
     dirty = false;
     renderer.render(scene, camera);
@@ -619,7 +678,7 @@ export async function createExplorer(
     },
     select(id, fly = true) {
       selected = id ? zones.find((z) => z.id === id) ?? null : null;
-      paint();
+      setOutline(selected);
       if (fly) { const [t, p] = selected ? zoneView(selected) : overviewView(); flyTo(t, p, 1700); }
     },
     overview(ms = 1400) { const [t, p] = overviewView(); flyTo(t, p, ms); },
@@ -629,7 +688,7 @@ export async function createExplorer(
       labelsOn = false;
       const z = zones.find((zz) => zz.id === view);
       selected = z ?? null;
-      paint();
+      setOutline(selected);
       let t: THREE.Vector3, p: THREE.Vector3;
       if (z) {
         t = new THREE.Vector3(z.label[0], hAt(z.label[0], z.label[1]), -z.label[1]);
@@ -647,6 +706,7 @@ export async function createExplorer(
     },
     film(f, a, zoom = 1) {
       frozen = true; labelsOn = false; selected = null; flight = null; zoomLog = 0;
+      setOutline(null);
       phaseF = Math.max(0, Math.min(3, f)); phase = Math.floor(phaseF + 1e-6); ovl = 0.28;
       paint();
       groups.forEach((g, k) => {
@@ -669,6 +729,7 @@ export async function createExplorer(
       canvas.removeEventListener("wheel", onWheel, { capture: true });
       stopUpgrade();
       for (const m of upgraded) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
+      setOutline(null); haloMat.dispose(); coreMat.dispose();
       controls.dispose(); renderer.dispose(); labelsEl.innerHTML = "";
     },
   };
@@ -697,21 +758,24 @@ export async function createExplorer(
     if (!alive) { meshes.forEach((b) => mod.disposeMesh(b.mesh)); return; }
     const placed = meshes.filter((b) => groups[b.phase]);
     meshes.filter((b) => !groups[b.phase]).forEach((b) => mod.disposeMesh(b.mesh));
+    const drop = () => { for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); } };
+    // Phones without parallel shader compile (a Mali-G52, for one) link the building shader on its first draw,
+    // which blocks for about 300 ms, so the meshes join the scene only while the camera is still.
+    const atRest = () => !flight && !zoomLog && !interacting && !frozen && performance.now() - restSince >= UPGRADE_REST_MS;
+    while (alive && !atRest()) await new Promise((r) => setTimeout(r, UPGRADE_REST_MS));
+    if (!alive) { drop(); return; }
     for (const b of placed) { b.mesh.userData.upgrade = b; groups[b.phase].add(b.mesh); }
-    // Compile before hiding the boxes: three logs a failed shader instead of throwing, so check it here.
     await renderer.compileAsync(scene, camera);
+    // Draw once now so any blocking link happens here, not on the reader's next gesture.
+    renderer.render(scene, camera);
+    // Check before hiding the boxes: three logs a failed shader instead of throwing.
     type ProgramInfo = { currentProgram?: { diagnostics?: { runnable: boolean } } };
     const broken = placed.some((b) => (renderer.properties.get(b.mesh.material) as ProgramInfo).currentProgram?.diagnostics?.runnable === false);
     if (broken || !alive) {
-      for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); }
+      drop();
       if (broken) throw new Error("building shader failed to compile");
       return;
     }
-    // Hold the visible swap until the camera is still, so boxes never turn into buildings mid-gesture.
-    while (alive && (flight || zoomLog || interacting || frozen || performance.now() - restSince < UPGRADE_REST_MS)) {
-      await new Promise((r) => setTimeout(r, UPGRADE_REST_MS));
-    }
-    if (!alive) { for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); } return; }
     upgradeMod = mod; manifest = m;
     if (shade) shadows[p0] = shade;
     for (const b of placed) {
