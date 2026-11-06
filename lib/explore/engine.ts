@@ -46,6 +46,35 @@ const EXAG = 1.5;
 const UPGRADE_FALLBACK_MS = 12000;
 const UPGRADE_TRIGGERS = ["pointerdown", "wheel", "keydown", "touchstart"] as const;
 const UPGRADE_RETRY_MS = 1000; // wait out a flight or a film capture before swapping meshes
+const UPGRADE_REST_MS = 700; // the swap waits for the camera to sit still this long, so it never lands mid-gesture
+// Wheel zoom eases toward the cursor instead of jumping one step per notch.
+const WHEEL_ZOOM_RATE = 0.0015; // log-distance per pixel of wheel delta
+const PINCH_ZOOM_RATE = 0.01; // trackpad pinch arrives as ctrl+wheel with much smaller deltas
+const WHEEL_LINE_PX = 16;
+const WHEEL_PAGE_PX = 800;
+const ZOOM_EASE_MS = 90; // time constant of the zoom easing
+const ZOOM_EPS = 2e-3; // below 0.2% of distance the rest is applied in one step
+const ANCHOR_MOVE_PX = 4; // re-pick the zoom anchor on the terrain only after the cursor moves this far
+const PAN_MARGIN_M = 500;
+// A frame that stalls (a ground re-upload, about 300 ms on a Mali-G52) advances animations by at most
+// this much, so they pause and carry on instead of jumping.
+const MAX_ANIM_STEP_MS = 34;
+const NARROW_PX = 700; // same breakpoint the overview uses
+const NARROW_LIFT = 0.32; // share of the view distance to aim short of a zone on phones
+// The selected zone's outline is a ribbon draped over the terrain, so selecting never repaints the
+// 2048 px ground texture (about 300 ms of GPU time on a Mali-G52 phone).
+const OUTLINE_HALO_M = 10;
+const OUTLINE_CORE_M = 5;
+const OUTLINE_LIFT_M = 3.5; // clears the gap between the bilinear height and the terrain triangles
+// Widths hold from this view distance in and grow with distance beyond it, so a zone tapped from the
+// overview is still clearly outlined; the ribbon is rebuilt when the camera stops.
+const OUTLINE_REF_DIST_M = 1500;
+const OUTLINE_MAX_SCALE = 5;
+const OUTLINE_RESCALE = 1.25; // rebuild only when the wanted scale drifts this far
+const OUTLINE_STEP_M = 12; // segments are split this finely so the ribbon follows the ground between corners
+// Flights scale with how far they travel and zoom, inside these bounds.
+const FLIGHT_MIN_MS = 700;
+const FLIGHT_MAX_MS = 2200;
 const KIND: Record<string, number> = {
   hospital: 0xf4f1ec, library: 0xc98f5a, museum: 0xd8b48a, commercial: 0xe7d7ef, hotel: 0xf3e3bd, villa: 0xf6efe0,
   apartment: 0xf2e8d8, townhouse: 0xe9d3b1, university: 0xdfe4fb, warehouse: 0xcfd2c6, barn: 0xb5532f, processing: 0xe8e2cf,
@@ -100,7 +129,9 @@ export async function createExplorer(
   };
 
   // ---------- renderer ----------
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  // No preserveDrawingBuffer: tools/film reads the canvas in the same task it renders, and keeping the
+  // buffer costs phones a full-screen copy every frame.
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, opts.small ? 1.5 : 2));
   const S = Math.min(opts.small ? 2048 : 4096, renderer.capabilities.maxTextureSize);
   const K = S / (2 * HW);
@@ -294,11 +325,6 @@ export async function createExplorer(
         L.strokeStyle = `rgba(240, 236, 224, ${(0.75 * ovl * (1 - ra)).toFixed(3)})`; L.lineWidth = 3 * K; L.setLineDash([8 * K, 8 * K]); L.stroke(); L.setLineDash([]);
       }
     }
-    if (selected) {
-      zonePath(L, selected);
-      L.strokeStyle = "rgba(255, 255, 255, 0.95)"; L.lineWidth = 8 * K; L.stroke();
-      L.strokeStyle = selected.color; L.lineWidth = 4 * K; L.stroke();
-    }
     // feather the outside edge of the site
     L.globalCompositeOperation = "destination-in";
     L.drawImage(maskCanvas, 0, 0);
@@ -411,8 +437,67 @@ export async function createExplorer(
     });
   };
 
+  // Same program as the skirt (Lambert, double sided, no map), so the first selection compiles nothing new.
+  const outlineMat = (c: string | number, order: number) => new THREE.MeshLambertMaterial({
+    color: 0x000000, emissive: new THREE.Color(c), side: THREE.DoubleSide, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2 * order, polygonOffsetUnits: -2 * order,
+  });
+  const ribbon = (rings: number[][][], width: number, mat: THREE.Material, order: number) => {
+    const pos: number[] = [], idx: number[] = [];
+    for (const r of rings) {
+      const pts: number[][] = [];
+      for (let i = 0; i < r.length; i++) {
+        const a = r[i], b = r[(i + 1) % r.length];
+        const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / OUTLINE_STEP_M));
+        for (let k = 0; k < n; k++) pts.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+      }
+      const base = pos.length / 3;
+      pts.forEach((q, i) => {
+        const pr = pts[(i - 1 + pts.length) % pts.length], nx = pts[(i + 1) % pts.length];
+        let dx = nx[0] - pr[0], dy = nx[1] - pr[1];
+        const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+        const ox = -dy * (width / 2), oy = dx * (width / 2);
+        for (const sgn of [1, -1]) {
+          const x = q[0] + sgn * ox, y = q[1] + sgn * oy;
+          pos.push(x, hAt(x, y) + OUTLINE_LIFT_M, -y);
+        }
+        const a = base + 2 * i, b = base + 2 * ((i + 1) % pts.length);
+        idx.push(a, a + 1, b, a + 1, b + 1, b);
+      });
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(new Float32Array(pos.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3));
+    geo.setIndex(idx);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.renderOrder = order;
+    return mesh;
+  };
+  const outline = new THREE.Group();
+  scene.add(outline);
+  const haloMat = outlineMat(0xffffff, 1);
+  const coreMat = outlineMat(0xffffff, 2);
+  let outlined: Zone | null = null, outlineScale = 1;
+  const wantedScale = (d = camera.position.distanceTo(controls.target)) => Math.min(OUTLINE_MAX_SCALE, Math.max(1, d / OUTLINE_REF_DIST_M));
+  const setOutline = (z: Zone | null, scale = wantedScale()) => {
+    for (const c of outline.children) (c as THREE.Mesh).geometry.dispose();
+    outline.clear();
+    outlined = z; outlineScale = scale;
+    if (!z) return;
+    const rings = z.polys.flatMap((p) => [p.o, ...p.h]);
+    coreMat.emissive.set(z.color);
+    outline.add(ribbon(rings, OUTLINE_HALO_M * scale, haloMat, 1), ribbon(rings, OUTLINE_CORE_M * scale, coreMat, 2));
+  };
+  const rescaleOutline = () => {
+    if (!outlined) return false;
+    const k = wantedScale(), r = k / outlineScale;
+    if (r < OUTLINE_RESCALE && r > 1 / OUTLINE_RESCALE) return false;
+    setOutline(outlined, k);
+    return true;
+  };
+
   // ---------- labels ----------
-  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number };
+  type Lbl = { el: HTMLElement; v: THREE.Vector3; zone?: Zone; w?: number; h?: number; on?: boolean; dim?: boolean; tf?: string };
   const labels: Lbl[] = [];
   const placed: number[][] = [];
   // Draw only when something changed (camera, flight, rising buildings, a call to the API), so a still
@@ -435,21 +520,75 @@ export async function createExplorer(
   for (const l of ctx.landmarks) addLabel(l.n, l.x, l.y, "mark");
 
   // ---------- camera ----------
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true; controls.dampingFactor = 0.08;
   controls.maxPolarAngle = 1.38; controls.minDistance = 120; controls.maxDistance = 11000;
   controls.screenSpacePanning = false;
   let flight: any = null;
+  let zoomLog = 0; // pending wheel zoom, as log of the distance factor still to apply
+  const zoomAnchor = new THREE.Vector3();
+  let anchorAt: [number, number] | null = null;
+  let interacting = false, moving = false, restSince = performance.now();
+  // A drag or pinch takes over from a flight at once instead of fighting it for the rest of its run.
+  controls.addEventListener("start", () => { interacting = true; flight = null; });
+  controls.addEventListener("end", () => { interacting = false; });
   const flyTo = (t: THREE.Vector3, p: THREE.Vector3, ms: number) => {
-    if (opts.reduceMotion || !ms) { controls.target.copy(t); camera.position.copy(p); controls.update(); return; }
-    flight = { t0: performance.now(), ms, fromT: controls.target.clone(), fromP: camera.position.clone(), toT: t, toP: p };
+    zoomLog = 0;
+    if (opts.reduceMotion || !ms) { flight = null; controls.target.copy(t); camera.position.copy(p); controls.update(); return; }
+    const fromT = controls.target.clone();
+    const fromO = camera.position.clone().sub(fromT), toO = p.clone().sub(t);
+    const d0 = fromO.length(), d1 = toO.length();
+    const k = Math.abs(Math.log(d1 / d0)) + fromT.distanceTo(t) / Math.max(d0, d1);
+    const dur = Math.min(FLIGHT_MAX_MS, Math.max(FLIGHT_MIN_MS, ms * (0.55 + 0.45 * k)));
+    flight = { el: 0, ms: dur, fromT, toT: t, fromDir: fromO.normalize(), toDir: toO.normalize(), d0, d1 };
   };
+  const dirTmp = new THREE.Vector3();
+  // Target moves in a straight line while distance eases on a log scale, so a long zoom feels even.
+  const stepFlight = (step: number) => {
+    flight.el += step;
+    const t = Math.min(1, flight.el / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    controls.target.lerpVectors(flight.fromT, flight.toT, e);
+    dirTmp.lerpVectors(flight.fromDir, flight.toDir, e).normalize();
+    camera.position.copy(controls.target).addScaledVector(dirTmp, flight.d0 * Math.pow(flight.d1 / flight.d0, e));
+    if (t >= 1) flight = null;
+  };
+  const pickAnchor = (clientX: number, clientY: number) => {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObject(terrain)[0];
+    zoomAnchor.copy(hit ? hit.point : controls.target);
+    anchorAt = [clientX, clientY];
+  };
+  const applyZoom = (logStep: number) => {
+    const d = camera.position.distanceTo(controls.target);
+    const nd = Math.min(controls.maxDistance, Math.max(controls.minDistance, d * Math.exp(logStep)));
+    const s = nd / d;
+    camera.position.sub(zoomAnchor).multiplyScalar(s).add(zoomAnchor);
+    controls.target.sub(zoomAnchor).multiplyScalar(s).add(zoomAnchor);
+    return s !== 1;
+  };
+  const onWheel = (e: WheelEvent) => {
+    // Runs before OrbitControls' own wheel handler, which steps the zoom without easing.
+    e.preventDefault(); e.stopImmediatePropagation();
+    flight = null;
+    const unit = e.deltaMode === 1 ? WHEEL_LINE_PX : e.deltaMode === 2 ? WHEEL_PAGE_PX : 1;
+    const step = e.deltaY * unit * (e.ctrlKey ? PINCH_ZOOM_RATE : WHEEL_ZOOM_RATE);
+    if (!anchorAt || Math.hypot(e.clientX - anchorAt[0], e.clientY - anchorAt[1]) > ANCHOR_MOVE_PX) pickAnchor(e.clientX, e.clientY);
+    if (opts.reduceMotion) { applyZoom(step); controls.update(); } else zoomLog += step;
+    dirty = true;
+  };
+  canvas.addEventListener("wheel", onWheel, { capture: true, passive: false });
   const all = zones.flatMap((z) => z.polys.flatMap((p) => p.o));
   const minX = Math.min(...all.map((q) => q[0])), maxX = Math.max(...all.map((q) => q[0]));
   const minY = Math.min(...all.map((q) => q[1])), maxY = Math.max(...all.map((q) => q[1]));
+  // Panning stops a little past the site, so the town can never be dragged out of view.
+  const panX0 = Math.max(-HW, minX - PAN_MARGIN_M), panX1 = Math.min(HW, maxX + PAN_MARGIN_M);
+  const panZ0 = Math.max(-HH, -maxY - PAN_MARGIN_M), panZ1 = Math.min(HH, -minY + PAN_MARGIN_M);
   const overviewView = (): [THREE.Vector3, THREE.Vector3] => {
     const mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
-    const narrow = canvas.clientWidth < 700;
+    const narrow = canvas.clientWidth < NARROW_PX;
     const t = new THREE.Vector3(mx, hAt(mx, my), -my - (narrow ? 250 : 450));
     if (narrow) { const d = 7600; return [t, t.clone().add(new THREE.Vector3(-0.12 * d, 0.86 * d, -0.5 * d))]; }
     const d = 4700;
@@ -458,11 +597,13 @@ export async function createExplorer(
   const zoneView = (z: Zone): [THREE.Vector3, THREE.Vector3] => {
     const t = new THREE.Vector3(z.label[0], hAt(z.label[0], z.label[1]), -z.label[1]);
     const d = Math.max(1350, Math.sqrt(z.acres * 4046.86) * 3.2);
-    return [t, t.clone().add(new THREE.Vector3(-0.35 * d, 0.62 * d, -0.78 * d))];
+    const off = new THREE.Vector3(-0.35 * d, 0.62 * d, -0.78 * d);
+    // On phones the info card covers the lower half, so aim short of the zone to lift it above the card.
+    if (canvas.clientWidth < NARROW_PX) t.addScaledVector(new THREE.Vector3(off.x, 0, off.z).normalize(), NARROW_LIFT * d);
+    return [t, t.clone().add(off)];
   };
 
   // ---------- picking ----------
-  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   let down: [number, number] | null = null;
   const onDown = (e: PointerEvent) => { down = [e.clientX, e.clientY]; };
   const onUp = (e: PointerEvent) => {
@@ -497,16 +638,22 @@ export async function createExplorer(
   const loop = (now: number) => {
     if (!alive) return;
     const dt = now - last; last = now;
-    if (flight) {
-      const t = Math.min(1, (now - flight.t0) / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      controls.target.lerpVectors(flight.fromT, flight.toT, e); camera.position.lerpVectors(flight.fromP, flight.toP, e);
-      if (t >= 1) flight = null;
+    if (flight) { stepFlight(Math.min(dt, MAX_ANIM_STEP_MS)); dirty = true; }
+    if (zoomLog) {
+      const step = Math.abs(zoomLog) < ZOOM_EPS ? zoomLog : zoomLog * (1 - Math.exp(-dt / ZOOM_EASE_MS));
+      zoomLog -= step;
+      if (!applyZoom(step)) zoomLog = 0; // at the distance limit, drop the rest
       dirty = true;
     }
-    controls.target.x = Math.max(-HW, Math.min(HW, controls.target.x));
-    controls.target.z = Math.max(-HH, Math.min(HH, controls.target.z));
-    if (controls.update()) dirty = true;
-    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + dt / 900); applyRise(g); dirty = true; }
+    // Clamp by moving camera and target together; moving the target alone would tilt the view at the edge.
+    const ox = Math.max(panX0, Math.min(panX1, controls.target.x)) - controls.target.x;
+    const oz = Math.max(panZ0, Math.min(panZ1, controls.target.z)) - controls.target.z;
+    if (ox || oz) { controls.target.x += ox; controls.target.z += oz; camera.position.x += ox; camera.position.z += oz; }
+    moving = controls.update();
+    if (moving || flight || zoomLog || interacting) { restSince = now; if (moving) dirty = true; }
+    else if (rescaleOutline()) dirty = true;
+    const animDt = Math.min(dt, MAX_ANIM_STEP_MS);
+    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + animDt / 900); applyRise(g); dirty = true; }
     if (!dirty) { raf = requestAnimationFrame(loop); return; }
     dirty = false;
     renderer.render(scene, camera);
@@ -519,15 +666,18 @@ export async function createExplorer(
       let vis = labelsOn && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05 && !(l.zone && dist > 9000);
       const x = ((tmp.x + 1) / 2) * w, y = ((1 - tmp.y) / 2) * h;
       if (vis) {
-        if (!l.w) { l.el.style.display = ""; l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
+        if (!l.w) { l.w = l.el.offsetWidth; l.h = l.el.offsetHeight; }
         const bw = l.w || 60, bh = l.h || 24;
         const box = [x - bw / 2 - 3, y - bh - 3, x + bw / 2 + 3, y + 3];
         if (placed.some((q) => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) vis = false;
         else placed.push(box);
       }
-      l.el.style.display = vis ? "" : "none";
-      if (vis) l.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
-      if (l.zone) l.el.style.opacity = l.zone.phase <= phase ? "1" : "0.72";
+      // Fade rather than toggle display, so labels culled for overlap do not flicker while the camera moves.
+      if (vis !== l.on) { l.on = vis; l.el.classList.toggle("on", vis); }
+      const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+      if (tf !== l.tf) { l.tf = tf; l.el.style.transform = tf; } // keep moving while it fades out
+      const dim = !!l.zone && l.zone.phase > phase;
+      if (dim !== l.dim) { l.dim = dim; l.el.classList.toggle("dim", dim); }
     }
     raf = requestAnimationFrame(loop);
   };
@@ -545,8 +695,11 @@ export async function createExplorer(
     },
     select(id, fly = true) {
       selected = id ? zones.find((z) => z.id === id) ?? null : null;
-      paint();
-      if (fly) { const [t, p] = selected ? zoneView(selected) : overviewView(); flyTo(t, p, 1700); }
+      if (!fly) { setOutline(selected); return; }
+      const [t, p] = selected ? zoneView(selected) : overviewView();
+      // Size the outline for where the flight ends, so it does not change width on arrival.
+      setOutline(selected, wantedScale(t.distanceTo(p)));
+      flyTo(t, p, 1700);
     },
     overview(ms = 1400) { const [t, p] = overviewView(); flyTo(t, p, ms); },
     showLabels(on) { labelsOn = on; },
@@ -555,7 +708,6 @@ export async function createExplorer(
       labelsOn = false;
       const z = zones.find((zz) => zz.id === view);
       selected = z ?? null;
-      paint();
       let t: THREE.Vector3, p: THREE.Vector3;
       if (z) {
         t = new THREE.Vector3(z.label[0], hAt(z.label[0], z.label[1]), -z.label[1]);
@@ -569,10 +721,12 @@ export async function createExplorer(
           ? t.clone().add(new THREE.Vector3(0.5 * d, 0.38 * d, 0.78 * d))
           : t.clone().add(new THREE.Vector3(-0.42 * d, 0.6 * d, -0.68 * d));
       }
-      flight = null; controls.target.copy(t); camera.position.copy(p); controls.update();
+      flight = null; zoomLog = 0; controls.target.copy(t); camera.position.copy(p); controls.update();
+      setOutline(selected);
     },
     film(f, a, zoom = 1) {
-      frozen = true; labelsOn = false; selected = null; flight = null;
+      frozen = true; labelsOn = false; selected = null; flight = null; zoomLog = 0;
+      setOutline(null);
       phaseF = Math.max(0, Math.min(3, f)); phase = Math.floor(phaseF + 1e-6); ovl = 0.28;
       paint();
       groups.forEach((g, k) => {
@@ -592,8 +746,10 @@ export async function createExplorer(
     dispose() {
       alive = false; cancelAnimationFrame(raf); ro.disconnect();
       canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointerup", onUp);
+      canvas.removeEventListener("wheel", onWheel, { capture: true });
       stopUpgrade();
       for (const m of upgraded) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
+      setOutline(null); haloMat.dispose(); coreMat.dispose();
       controls.dispose(); renderer.dispose(); labelsEl.innerHTML = "";
     },
   };
@@ -622,13 +778,21 @@ export async function createExplorer(
     if (!alive) { meshes.forEach((b) => mod.disposeMesh(b.mesh)); return; }
     const placed = meshes.filter((b) => groups[b.phase]);
     meshes.filter((b) => !groups[b.phase]).forEach((b) => mod.disposeMesh(b.mesh));
+    const drop = () => { for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); } };
+    // Phones without parallel shader compile (a Mali-G52, for one) link the building shader on its first draw,
+    // which blocks for about 300 ms, so the meshes join the scene only while the camera is still.
+    const atRest = () => !flight && !zoomLog && !interacting && !frozen && performance.now() - restSince >= UPGRADE_REST_MS;
+    while (alive && !atRest()) await new Promise((r) => setTimeout(r, UPGRADE_REST_MS));
+    if (!alive) { drop(); return; }
     for (const b of placed) { b.mesh.userData.upgrade = b; groups[b.phase].add(b.mesh); }
-    // Compile before hiding the boxes: three logs a failed shader instead of throwing, so check it here.
     await renderer.compileAsync(scene, camera);
+    // Draw once now so any blocking link happens here, not on the reader's next gesture.
+    renderer.render(scene, camera);
+    // Check before hiding the boxes: three logs a failed shader instead of throwing.
     type ProgramInfo = { currentProgram?: { diagnostics?: { runnable: boolean } } };
     const broken = placed.some((b) => (renderer.properties.get(b.mesh.material) as ProgramInfo).currentProgram?.diagnostics?.runnable === false);
     if (broken || !alive) {
-      for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); }
+      drop();
       if (broken) throw new Error("building shader failed to compile");
       return;
     }
@@ -649,11 +813,12 @@ export async function createExplorer(
     if (frozen || flight) { clearTimeout(upgradeTimer); upgradeTimer = setTimeout(startUpgrade, UPGRADE_RETRY_MS); return; }
     upgradeStarted = true;
     clearTimeout(upgradeTimer);
-    for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade);
+    for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade, true);
     void upgrade().catch((e) => console.warn("Explorer upgrade skipped:", e));
   };
   let upgradeTimer = setTimeout(startUpgrade, UPGRADE_FALLBACK_MS);
-  for (const t of UPGRADE_TRIGGERS) window.addEventListener(t, startUpgrade, { passive: true });
-  stopUpgrade = () => { clearTimeout(upgradeTimer); for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade); };
+  // Capture phase, since the wheel handler stops the event before it would bubble to window.
+  for (const t of UPGRADE_TRIGGERS) window.addEventListener(t, startUpgrade, { passive: true, capture: true });
+  stopUpgrade = () => { clearTimeout(upgradeTimer); for (const t of UPGRADE_TRIGGERS) window.removeEventListener(t, startUpgrade, true); };
   return api;
 }
