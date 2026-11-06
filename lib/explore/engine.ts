@@ -46,7 +46,7 @@ const EXAG = 1.5;
 const UPGRADE_FALLBACK_MS = 12000;
 const UPGRADE_TRIGGERS = ["pointerdown", "wheel", "keydown", "touchstart"] as const;
 const UPGRADE_RETRY_MS = 1000; // wait out a flight or a film capture before swapping meshes
-const UPGRADE_REST_MS = 250; // the swap waits for the camera to sit still this long, so it never lands mid-gesture
+const UPGRADE_REST_MS = 700; // the swap waits for the camera to sit still this long, so it never lands mid-gesture
 // Wheel zoom eases toward the cursor instead of jumping one step per notch.
 const WHEEL_ZOOM_RATE = 0.0015; // log-distance per pixel of wheel delta
 const PINCH_ZOOM_RATE = 0.01; // trackpad pinch arrives as ctrl+wheel with much smaller deltas
@@ -56,7 +56,9 @@ const ZOOM_EASE_MS = 90; // time constant of the zoom easing
 const ZOOM_EPS = 2e-3; // below 0.2% of distance the rest is applied in one step
 const ANCHOR_MOVE_PX = 4; // re-pick the zoom anchor on the terrain only after the cursor moves this far
 const PAN_MARGIN_M = 500;
-const MAX_RISE_STEP_MS = 34;
+// A frame that stalls (a ground re-upload, about 300 ms on a Mali-G52) advances animations by at most
+// this much, so they pause and carry on instead of jumping.
+const MAX_ANIM_STEP_MS = 34;
 const NARROW_PX = 700; // same breakpoint the overview uses
 const NARROW_LIFT = 0.32; // share of the view distance to aim short of a zone on phones
 // The selected zone's outline is a ribbon draped over the terrain, so selecting never repaints the
@@ -64,6 +66,11 @@ const NARROW_LIFT = 0.32; // share of the view distance to aim short of a zone o
 const OUTLINE_HALO_M = 10;
 const OUTLINE_CORE_M = 5;
 const OUTLINE_LIFT_M = 3.5; // clears the gap between the bilinear height and the terrain triangles
+// Widths hold from this view distance in and grow with distance beyond it, so a zone tapped from the
+// overview is still clearly outlined; the ribbon is rebuilt when the camera stops.
+const OUTLINE_REF_DIST_M = 1500;
+const OUTLINE_MAX_SCALE = 5;
+const OUTLINE_RESCALE = 1.25; // rebuild only when the wanted scale drifts this far
 const OUTLINE_STEP_M = 12; // segments are split this finely so the ribbon follows the ground between corners
 // Flights scale with how far they travel and zoom, inside these bounds.
 const FLIGHT_MIN_MS = 700;
@@ -470,13 +477,23 @@ export async function createExplorer(
   scene.add(outline);
   const haloMat = outlineMat(0xffffff, 1);
   const coreMat = outlineMat(0xffffff, 2);
-  const setOutline = (z: Zone | null) => {
+  let outlined: Zone | null = null, outlineScale = 1;
+  const wantedScale = (d = camera.position.distanceTo(controls.target)) => Math.min(OUTLINE_MAX_SCALE, Math.max(1, d / OUTLINE_REF_DIST_M));
+  const setOutline = (z: Zone | null, scale = wantedScale()) => {
     for (const c of outline.children) (c as THREE.Mesh).geometry.dispose();
     outline.clear();
+    outlined = z; outlineScale = scale;
     if (!z) return;
     const rings = z.polys.flatMap((p) => [p.o, ...p.h]);
     coreMat.emissive.set(z.color);
-    outline.add(ribbon(rings, OUTLINE_HALO_M, haloMat, 1), ribbon(rings, OUTLINE_CORE_M, coreMat, 2));
+    outline.add(ribbon(rings, OUTLINE_HALO_M * scale, haloMat, 1), ribbon(rings, OUTLINE_CORE_M * scale, coreMat, 2));
+  };
+  const rescaleOutline = () => {
+    if (!outlined) return false;
+    const k = wantedScale(), r = k / outlineScale;
+    if (r < OUTLINE_RESCALE && r > 1 / OUTLINE_RESCALE) return false;
+    setOutline(outlined, k);
+    return true;
   };
 
   // ---------- labels ----------
@@ -524,12 +541,13 @@ export async function createExplorer(
     const d0 = fromO.length(), d1 = toO.length();
     const k = Math.abs(Math.log(d1 / d0)) + fromT.distanceTo(t) / Math.max(d0, d1);
     const dur = Math.min(FLIGHT_MAX_MS, Math.max(FLIGHT_MIN_MS, ms * (0.55 + 0.45 * k)));
-    flight = { t0: performance.now(), ms: dur, fromT, toT: t, fromDir: fromO.normalize(), toDir: toO.normalize(), d0, d1 };
+    flight = { el: 0, ms: dur, fromT, toT: t, fromDir: fromO.normalize(), toDir: toO.normalize(), d0, d1 };
   };
   const dirTmp = new THREE.Vector3();
   // Target moves in a straight line while distance eases on a log scale, so a long zoom feels even.
-  const stepFlight = (now: number) => {
-    const t = Math.min(1, (now - flight.t0) / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const stepFlight = (step: number) => {
+    flight.el += step;
+    const t = Math.min(1, flight.el / flight.ms), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     controls.target.lerpVectors(flight.fromT, flight.toT, e);
     dirTmp.lerpVectors(flight.fromDir, flight.toDir, e).normalize();
     camera.position.copy(controls.target).addScaledVector(dirTmp, flight.d0 * Math.pow(flight.d1 / flight.d0, e));
@@ -620,7 +638,7 @@ export async function createExplorer(
   const loop = (now: number) => {
     if (!alive) return;
     const dt = now - last; last = now;
-    if (flight) { stepFlight(now); dirty = true; }
+    if (flight) { stepFlight(Math.min(dt, MAX_ANIM_STEP_MS)); dirty = true; }
     if (zoomLog) {
       const step = Math.abs(zoomLog) < ZOOM_EPS ? zoomLog : zoomLog * (1 - Math.exp(-dt / ZOOM_EASE_MS));
       zoomLog -= step;
@@ -633,10 +651,9 @@ export async function createExplorer(
     if (ox || oz) { controls.target.x += ox; controls.target.z += oz; camera.position.x += ox; camera.position.z += oz; }
     moving = controls.update();
     if (moving || flight || zoomLog || interacting) { restSince = now; if (moving) dirty = true; }
-    // A phase change re-uploads the ground texture (about 300 ms on a Mali-G52); capping the step makes
-    // the buildings start rising after that pause instead of jumping a third of the way.
-    const riseDt = Math.min(dt, MAX_RISE_STEP_MS);
-    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + riseDt / 900); applyRise(g); dirty = true; }
+    else if (rescaleOutline()) dirty = true;
+    const animDt = Math.min(dt, MAX_ANIM_STEP_MS);
+    if (!frozen) for (const g of groups) if (g.visible && g.userData.t < 1) { g.userData.t = Math.min(1, g.userData.t + animDt / 900); applyRise(g); dirty = true; }
     if (!dirty) { raf = requestAnimationFrame(loop); return; }
     dirty = false;
     renderer.render(scene, camera);
@@ -678,8 +695,11 @@ export async function createExplorer(
     },
     select(id, fly = true) {
       selected = id ? zones.find((z) => z.id === id) ?? null : null;
-      setOutline(selected);
-      if (fly) { const [t, p] = selected ? zoneView(selected) : overviewView(); flyTo(t, p, 1700); }
+      if (!fly) { setOutline(selected); return; }
+      const [t, p] = selected ? zoneView(selected) : overviewView();
+      // Size the outline for where the flight ends, so it does not change width on arrival.
+      setOutline(selected, wantedScale(t.distanceTo(p)));
+      flyTo(t, p, 1700);
     },
     overview(ms = 1400) { const [t, p] = overviewView(); flyTo(t, p, ms); },
     showLabels(on) { labelsOn = on; },
@@ -688,7 +708,6 @@ export async function createExplorer(
       labelsOn = false;
       const z = zones.find((zz) => zz.id === view);
       selected = z ?? null;
-      setOutline(selected);
       let t: THREE.Vector3, p: THREE.Vector3;
       if (z) {
         t = new THREE.Vector3(z.label[0], hAt(z.label[0], z.label[1]), -z.label[1]);
@@ -703,6 +722,7 @@ export async function createExplorer(
           : t.clone().add(new THREE.Vector3(-0.42 * d, 0.6 * d, -0.68 * d));
       }
       flight = null; zoomLog = 0; controls.target.copy(t); camera.position.copy(p); controls.update();
+      setOutline(selected);
     },
     film(f, a, zoom = 1) {
       frozen = true; labelsOn = false; selected = null; flight = null; zoomLog = 0;
