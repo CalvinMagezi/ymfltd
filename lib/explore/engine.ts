@@ -46,7 +46,9 @@ const EXAG = 1.5;
 const UPGRADE_FALLBACK_MS = 12000;
 const UPGRADE_TRIGGERS = ["pointerdown", "wheel", "keydown", "touchstart"] as const;
 const UPGRADE_RETRY_MS = 1000; // wait out a flight or a film capture before swapping meshes
-const UPGRADE_REST_MS = 700; // the swap waits for the camera to sit still this long, so it never lands mid-gesture
+const REST_MS = 700; // work that stalls a phone (shader links, texture uploads) waits for the camera to sit still this long
+const PHASES = [0, 1, 2, 3];
+const FILM_OVL = 0.28; // the film shows the unbuilt plan faintly
 // Wheel zoom eases toward the cursor instead of jumping one step per notch.
 const WHEEL_ZOOM_RATE = 0.0015; // log-distance per pixel of wheel delta
 const PINCH_ZOOM_RATE = 0.01; // trackpad pinch arrives as ctrl+wheel with much smaller deltas
@@ -151,17 +153,31 @@ export async function createExplorer(
   scene.add(sun);
 
   // ---------- terrain ----------
-  const texCanvas = document.createElement("canvas");
-  texCanvas.width = texCanvas.height = S;
-  const tex = new THREE.CanvasTexture(texCanvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const terrainMat = new THREE.MeshLambertMaterial();
+  // The baked shadows multiply the ground in the shader, so changing phase swaps textures instead of repainting.
+  const shadowU = {
+    gShadow: { value: null as THREE.Texture | null },
+    gShadowOn: { value: 0 },
+    gShadowRect: { value: new THREE.Vector4(0, 0, 1, 1) },
+  };
+  terrainMat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, shadowU);
+    sh.fragmentShader = "uniform sampler2D gShadow;\nuniform float gShadowOn;\nuniform vec4 gShadowRect;\n" + sh.fragmentShader.replace(
+      "#include <map_fragment>",
+      `#include <map_fragment>
+      if (gShadowOn > 0.5) {
+        vec2 su = (vMapUv - gShadowRect.xy) / gShadowRect.zw;
+        if (su == clamp(su, 0.0, 1.0)) diffuseColor.rgb *= texture2D(gShadow, su).rgb;
+      }`,
+    );
+  };
+  terrainMat.customProgramCacheKey = () => "ymf-ground";
   const tgeo = new THREE.PlaneGeometry(2 * HW, 2 * HH, N - 1, N - 1);
   tgeo.rotateX(-Math.PI / 2);
   const pos = tgeo.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setY(i, (DEM[i] / 10 - BASE) * EXAG);
   tgeo.computeVertexNormals();
-  const terrain = new THREE.Mesh(tgeo, new THREE.MeshLambertMaterial({ map: tex }));
+  const terrain = new THREE.Mesh(tgeo, terrainMat);
   scene.add(terrain);
   {
     const depth = -70;
@@ -218,10 +234,14 @@ export async function createExplorer(
     g.restore();
   };
 
-  const baseCanvas = document.createElement("canvas");
-  baseCanvas.width = baseCanvas.height = S;
-  {
-    const g = baseCanvas.getContext("2d")!;
+  const blank = () => { const c = document.createElement("canvas"); c.width = c.height = S; return c; };
+  type GroundCanvases = { base: HTMLCanvasElement; mask: HTMLCanvasElement; layer: HTMLCanvasElement; out: HTMLCanvasElement };
+  let gc: GroundCanvases | null = null;
+  // Built on demand: once every phase is uploaded they are freed, and only the film or a lost context needs them again.
+  const groundCanvases = () => {
+    if (gc) return gc;
+    const base = blank(), mask = blank();
+    const g = base.getContext("2d")!;
     g.drawImage(groundImg, 0, 0, S, S);
     g.lineCap = "round"; g.lineJoin = "round";
     const styles: [number, string][] = [[0, ""], [5, "rgba(244, 238, 224, 0.85)"], [10, "rgba(250, 230, 168, 0.95)"]];
@@ -229,62 +249,74 @@ export async function createExplorer(
       g.strokeStyle = styles[cls][1]; g.lineWidth = Math.max(1, styles[cls][0] * K);
       for (const r of ctx.roads) if (r.c === cls) { line(g, r.p); g.stroke(); }
     }
-  }
-  // soft mask: the union of all zones, blurred, so the site's outer edge reads as a concept, not a survey line
-  const maskCanvas = document.createElement("canvas");
-  maskCanvas.width = maskCanvas.height = S;
-  {
-    const g = maskCanvas.getContext("2d")!;
-    g.filter = `blur(${Math.round(55 * K)}px)`;
-    g.fillStyle = "#000";
-    for (const z of zones) { zonePath(g, z); g.fill("evenodd"); }
-    g.filter = "none";
-    for (const z of zones) { const shrink = z; zonePath(g, shrink); }
-  }
-  const layer = document.createElement("canvas");
-  layer.width = layer.height = S;
-
-  let phase = 3;
-  let phaseF = 3; // fractional phase used by the film; equals phase in normal use
-  let ovl = 1; // strength of the not-yet-built plan overlay
-  let selected: Zone | null = null;
-  const liveAmt = (ph: number) => (ph <= 0 ? 1 : Math.max(0, Math.min(1, phaseF - (ph - 1))));
-
-  // Baked shadow maps, one per phase, fetched on first use once the upgrade manifest is known.
-  let upgradeMod: typeof import("./upgrade") | null = null;
-  let manifest: UpgradeManifest | null = null;
-  const shadows: (HTMLImageElement | null | undefined)[] = [];
-  const shadowFor = (p: number) => {
-    if (!manifest || !upgradeMod) return null;
-    if (shadows[p] === undefined) {
-      shadows[p] = null;
-      upgradeMod.loadImage(`${opts.base}/upgrade/${manifest.shadows[p]}`).then((im) => {
-        shadows[p] = im;
-        if (alive && p === phase) { paint(); dirty = true; }
-      }, () => undefined);
-    }
-    return shadows[p];
+    // soft mask: the union of all zones, blurred, so the site's outer edge reads as a concept, not a survey line
+    const m = mask.getContext("2d")!;
+    m.filter = `blur(${Math.round(55 * K)}px)`;
+    m.fillStyle = "#000";
+    for (const z of zones) { zonePath(m, z); m.fill("evenodd"); }
+    return (gc = { base, mask, layer: blank(), out: blank() });
+  };
+  const releaseCanvases = () => {
+    if (!gc) return;
+    for (const c of Object.values(gc)) c.width = c.height = 0;
+    gc = null;
   };
 
-  function paint() {
+  let phase = 3;
+  let selected: Zone | null = null;
+  const liveAmt = (ph: number, f: number) => (ph <= 0 ? 1 : Math.max(0, Math.min(1, f - (ph - 1))));
+
+  // Baked shadow maps, one per phase, fetched once the upgrade manifest is known.
+  let upgradeMod: typeof import("./upgrade") | null = null;
+  let manifest: UpgradeManifest | null = null;
+  const shadowTex: (THREE.Texture | null | undefined)[] = [];
+  const shadowTexture = (im: HTMLImageElement) => {
+    const t = new THREE.Texture(im);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.needsUpdate = true;
+    // Upload while the camera is still; does nothing if the shadow was already drawn.
+    whenIdle(() => renderer.initTexture(t));
+    return t;
+  };
+  const shadowFor = (p: number) => {
+    if (!manifest || !upgradeMod) return null;
+    if (shadowTex[p] === undefined) {
+      shadowTex[p] = null;
+      upgradeMod.loadImage(`${opts.base}/upgrade/${manifest.shadows[p]}`).then((im) => {
+        if (!alive) return;
+        shadowTex[p] = shadowTexture(im);
+        if (p === phase) { showShadow(p); dirty = true; }
+      }, () => undefined);
+    }
+    return shadowTex[p];
+  };
+  const showShadow = (p: number) => {
+    const t = shadowFor(p);
+    shadowU.gShadow.value = t ?? null;
+    shadowU.gShadowOn.value = t ? 1 : 0;
+  };
+
+  /** Paints the ground at phase `at` (fractional in the film) with the unbuilt overlay at strength o. */
+  function paintGround(at: number, o: number) {
+    const { base, mask, layer, out } = groundCanvases();
     const L = layer.getContext("2d")!;
     L.clearRect(0, 0, S, S);
     L.lineCap = "round"; L.lineJoin = "round";
     for (const z of zones) {
-      const a = liveAmt(z.phase);
-      const mix = (off: number, on: number) => off * ovl + (on - off * ovl) * a;
+      const a = liveAmt(z.phase, at);
+      const mix = (off: number, on: number) => off * o + (on - off * o) * a;
       zonePath(L, z);
       if (z.id === "forest") L.fillStyle = hexA(z.color, mix(0.16, 0.32));
       else if (z.id === "wetland") L.fillStyle = hexA("#3f8f9a", 0.6);
       else L.fillStyle = hexA(z.color, mix(0.2, 0.62));
       L.fill("evenodd");
-      L.strokeStyle = `rgba(255,255,255,${(0.75 * Math.max(a, ovl)).toFixed(3)})`; L.lineWidth = Math.max(1, 2.5 * K);
+      L.strokeStyle = `rgba(255,255,255,${(0.75 * Math.max(a, o)).toFixed(3)})`; L.lineWidth = Math.max(1, 2.5 * K);
       L.setLineDash(a >= 0.999 ? [] : [10 * K, 7 * K]); L.stroke(); L.setLineDash([]);
     }
     const wz = zones.find((z) => z.id === "wetland");
     if (wz) for (const p of wz.polys) stripes(L, p.o, 0.6, 26, "rgba(190, 230, 232, 0.4)", 5);
     for (const f of plan.paint) {
-      const fa = liveAmt(f.ph);
+      const fa = liveAmt(f.ph, at);
       if (fa <= 0) continue;
       L.globalAlpha = fa;
       if (f.t === "golf") {
@@ -314,7 +346,7 @@ export async function createExplorer(
     }
     for (const r of plan.roads) {
       line(L, r.p);
-      const ra = liveAmt(r.ph);
+      const ra = liveAmt(r.ph, at);
       if (ra > 0) {
         L.globalAlpha = ra;
         L.strokeStyle = "rgba(90, 84, 72, 0.9)"; L.lineWidth = 12 * K; L.stroke();
@@ -322,25 +354,41 @@ export async function createExplorer(
         L.globalAlpha = 1;
       }
       if (ra < 1) {
-        L.strokeStyle = `rgba(240, 236, 224, ${(0.75 * ovl * (1 - ra)).toFixed(3)})`; L.lineWidth = 3 * K; L.setLineDash([8 * K, 8 * K]); L.stroke(); L.setLineDash([]);
+        L.strokeStyle = `rgba(240, 236, 224, ${(0.75 * o * (1 - ra)).toFixed(3)})`; L.lineWidth = 3 * K; L.setLineDash([8 * K, 8 * K]); L.stroke(); L.setLineDash([]);
       }
     }
     // feather the outside edge of the site
     L.globalCompositeOperation = "destination-in";
-    L.drawImage(maskCanvas, 0, 0);
+    L.drawImage(mask, 0, 0);
     L.globalCompositeOperation = "source-over";
-    const g = texCanvas.getContext("2d")!;
-    g.drawImage(baseCanvas, 0, 0);
+    const g = out.getContext("2d")!;
+    g.drawImage(base, 0, 0);
     g.drawImage(layer, 0, 0);
-    const shade = shadowFor(phase);
-    if (shade && manifest) {
-      const b = manifest.shadowBounds;
-      g.globalCompositeOperation = "multiply";
-      g.drawImage(shade, cx(b.x0), cy(b.y1), cx(b.x1) - cx(b.x0), cy(b.y0) - cy(b.y1));
-      g.globalCompositeOperation = "source-over";
-    }
-    tex.needsUpdate = true;
+    return out;
   }
+
+  const groundTexture = (c: HTMLCanvasElement) => {
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    return t;
+  };
+  // One uploaded texture per phase: a phone takes about 350 ms to repaint and upload the ground, so that
+  // happens once per phase while the camera is still, and a phase change only swaps the map.
+  const phaseTex: (THREE.CanvasTexture | undefined)[] = [];
+  let filmTex: THREE.CanvasTexture | null = null;
+  const bakePhase = (p: number) => {
+    const t = groundTexture(paintGround(p, 1));
+    renderer.initTexture(t);
+    phaseTex[p] = t;
+  };
+  const showPhase = (p: number) => {
+    if (!phaseTex[p]) bakePhase(p);
+    terrainMat.map = phaseTex[p]!;
+    showShadow(p);
+    if (filmTex) { filmTex.dispose(); filmTex = null; }
+    if (PHASES.every((k) => phaseTex[k])) releaseCanvases();
+  };
 
   // ---------- 3D content ----------
   const UP = new THREE.Vector3(0, 1, 0);
@@ -682,16 +730,30 @@ export async function createExplorer(
     raf = requestAnimationFrame(loop);
   };
 
+  const atRest = () => !flight && !zoomLog && !interacting && !frozen && performance.now() - restSince >= REST_MS
+    && !groups.some((g) => g.visible && g.userData.t < 1);
+  const idleJobs: (() => void)[] = [];
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const runIdle = () => {
+    idleTimer = undefined;
+    if (!alive) return;
+    if (atRest()) idleJobs.shift()?.();
+    if (idleJobs.length) idleTimer = setTimeout(runIdle, REST_MS);
+  };
+  // Runs one job per still moment, so a texture upload never lands mid-gesture.
+  const whenIdle = (job: () => void) => { idleJobs.push(job); idleTimer ??= setTimeout(runIdle, REST_MS); };
+  const bakeRest = () => { for (const p of PHASES) whenIdle(() => { if (!phaseTex[p]) bakePhase(p); }); };
+
   const api: Explorer = {
     zones,
     setPhase(p, animate = true) {
-      phase = p; phaseF = p; ovl = 1; frozen = false;
+      phase = p; frozen = false;
       groups.forEach((g, k) => {
         const show = k <= p;
         if (show && !g.visible) { g.visible = true; g.userData.t = animate && !opts.reduceMotion ? 0 : 1; applyRise(g); }
         if (!show) g.visible = false;
       });
-      paint();
+      showPhase(p);
     },
     select(id, fly = true) {
       selected = id ? zones.find((z) => z.id === id) ?? null : null;
@@ -727,8 +789,13 @@ export async function createExplorer(
     film(f, a, zoom = 1) {
       frozen = true; labelsOn = false; selected = null; flight = null; zoomLog = 0;
       setOutline(null);
-      phaseF = Math.max(0, Math.min(3, f)); phase = Math.floor(phaseF + 1e-6); ovl = 0.28;
-      paint();
+      const phaseF = Math.max(0, Math.min(3, f));
+      phase = Math.floor(phaseF + 1e-6);
+      const out = paintGround(phaseF, FILM_OVL);
+      if (filmTex?.image === out) filmTex.needsUpdate = true;
+      else { filmTex?.dispose(); filmTex = groundTexture(out); }
+      terrainMat.map = filmTex;
+      showShadow(phase);
       groups.forEach((g, k) => {
         const amt = k === 0 ? 1 : Math.max(0, Math.min(1, phaseF - (k - 1)));
         g.visible = amt > 0;
@@ -750,6 +817,9 @@ export async function createExplorer(
       stopUpgrade();
       for (const m of upgraded) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
       setOutline(null); haloMat.dispose(); coreMat.dispose();
+      clearTimeout(idleTimer); canvas.removeEventListener("webglcontextrestored", onRestored);
+      for (const t of [...phaseTex, ...shadowTex, filmTex]) t?.dispose();
+      releaseCanvases(); terrainMat.dispose();
       controls.dispose(); renderer.dispose(); labelsEl.innerHTML = "";
     },
   };
@@ -759,6 +829,15 @@ export async function createExplorer(
     if (typeof f === "function") (api as any)[k] = (...a: unknown[]) => { dirty = true; return f.apply(api, a); };
   }
   api.setPhase(3, false);
+  bakeRest();
+  // Uploaded textures are gone with a lost context, so bake again from scratch.
+  const onRestored = () => {
+    phaseTex.length = 0; filmTex = null;
+    if (!frozen) showPhase(phase);
+    bakeRest();
+    dirty = true;
+  };
+  canvas.addEventListener("webglcontextrestored", onRestored);
   const [t0, p0] = overviewView();
   flyTo(t0, p0, 0);
   raf = requestAnimationFrame(loop);
@@ -769,7 +848,7 @@ export async function createExplorer(
   const upgrade = async () => {
     const mod = await import("./upgrade");
     const m = await mod.loadManifest(opts.base);
-    // Fetch the current phase's shadow map with the buildings, so the ground repaints and re-uploads once.
+    // Fetch the current phase's shadow map with the buildings, so both appear together.
     const p0 = phase;
     const [meshes, shade] = await Promise.all([
       mod.loadBuildings(opts.base, m),
@@ -781,8 +860,7 @@ export async function createExplorer(
     const drop = () => { for (const b of placed) { b.mesh.removeFromParent(); mod.disposeMesh(b.mesh); } };
     // Phones without parallel shader compile (a Mali-G52, for one) link the building shader on its first draw,
     // which blocks for about 300 ms, so the meshes join the scene only while the camera is still.
-    const atRest = () => !flight && !zoomLog && !interacting && !frozen && performance.now() - restSince >= UPGRADE_REST_MS;
-    while (alive && !atRest()) await new Promise((r) => setTimeout(r, UPGRADE_REST_MS));
+    while (alive && !atRest()) await new Promise((r) => setTimeout(r, REST_MS));
     if (!alive) { drop(); return; }
     for (const b of placed) { b.mesh.userData.upgrade = b; groups[b.phase].add(b.mesh); }
     await renderer.compileAsync(scene, camera);
@@ -797,13 +875,16 @@ export async function createExplorer(
       return;
     }
     upgradeMod = mod; manifest = m;
-    if (shade) shadows[p0] = shade;
+    const b = m.shadowBounds;
+    shadowU.gShadowRect.value.set((b.x0 + HW) / (2 * HW), (b.y0 + HH) / (2 * HH), (b.x1 - b.x0) / (2 * HW), (b.y1 - b.y0) / (2 * HH));
+    if (shade) shadowTex[p0] = shadowTexture(shade);
     for (const b of placed) {
       upgraded.push(b.mesh);
       for (const c of groups[b.phase].children) if (c.userData.boxes) c.visible = false;
     }
     groups.forEach(applyRise);
-    paint();
+    if (!frozen) showShadow(phase);
+    for (const p of PHASES) shadowFor(p);
     dirty = true;
   };
   let upgradeStarted = false;
