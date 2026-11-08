@@ -143,11 +143,10 @@ export default function ExploreClient() {
       <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full touch-none" aria-label="3D concept model of New Kikwite Town. Drag to turn, scroll or pinch to zoom." />
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 overflow-hidden" />
 
-      {!ready && (
-        <div className="absolute inset-0 grid place-items-center bg-paper">
-          <p className="font-mono text-sm text-muted">{error ? `The model could not load (${error}). Reload the page to try again.` : "Loading the terrain model…"}</p>
-        </div>
-      )}
+      {/* Stays mounted and fades out, so the model is revealed rather than cut to. */}
+      <div aria-hidden={ready} className={`absolute inset-0 grid place-items-center bg-paper transition-opacity duration-500 ${ready ? "pointer-events-none opacity-0" : ""}`}>
+        {!ready && <p className="font-mono text-sm text-muted">{error ? `The model could not load (${error}). Reload the page to try again.` : "Loading the terrain model…"}</p>}
+      </div>
 
       {/* Phase control */}
       <div className="absolute left-4 top-4 z-10 grid w-[min(330px,calc(100%-2rem))] gap-2 rounded-[14px] border border-line bg-card/95 p-3 shadow-lg backdrop-blur" style={{ left: "max(16px, env(safe-area-inset-left, 0px))" }}>
